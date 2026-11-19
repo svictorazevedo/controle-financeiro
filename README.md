@@ -1,23 +1,33 @@
 # 💰 Controle Financeiro
 
-Sistema web de controle financeiro doméstico: cadastre a casa e os moradores, informe quanto cada um ganha e
-seus objetivos em percentual, lance os gastos por categoria e deixe os descontos automáticos (dízimo, aluguel,
-parcelas, assinaturas) entrarem sozinhos todo mês. Tem um painel com **ganhos do mês** e **gastos do mês**
-e um assistente de IA (Claude, ou outro provedor) que analisa as finanças da casa.
+Controle financeiro doméstico: cadastre a casa e os moradores, informe quanto cada um ganha e seus objetivos em
+percentual, lance os gastos por categoria e deixe os descontos automáticos (dízimo, aluguel, parcelas, assinaturas)
+entrarem sozinhos todo mês. O painel mostra **ganhos do mês** e **gastos do mês**, e um assistente de IA (Claude ou
+outro provedor) analisa as finanças da casa.
+
+**Custo: R$ 0.** Site estático no **GitHub Pages** + login e banco no **Supabase** (plano gratuito).
+
+```
+Navegador ──► GitHub Pages (HTML + JS, estático)
+    │
+    ├──► Supabase Auth ........ login, senha, recuperação por e-mail
+    ├──► Supabase Postgres .... dados, protegidos por RLS (supabase/schema.sql)
+    └──► Edge Function "ai" ... guarda a chave de IA criptografada e chama Claude / OpenAI / Gemini
+```
 
 ## Funcionalidades
 
 | Área | O que faz |
 |---|---|
-| **Login e senha** | Cadastro, login, troca de senha, "sair de todos os dispositivos". Senhas com hash scrypt. |
-| **Casa e moradores** | Cada usuário cria uma ou mais casas. O administrador adiciona moradores (com ou sem login, ex.: crianças) e gera **códigos de convite** de uso único para darem acesso. |
-| **Ganhos** | Cada morador informa quanto ganha: mensal (salário) ou único (freela, 13º), com período opcional. |
-| **Objetivos em %** | Ex.: Reserva 10%, Investimentos 15%, Viagem 5%. O sistema calcula o valor em R$ sobre a renda do mês e impede passar de 100%. |
-| **Gastos** | Lançamento com descrição, valor, data, categoria e de quem é (ou "Casa", compartilhado). |
-| **Categorias** | 15 categorias padrão já criadas em cada casa; renomeie, exclua ou crie as suas. |
-| **Descontos automáticos** | **Percentual da renda** (dízimo 10%), **valor fixo** (aluguel, internet), **parcelado** (10x — some do painel depois da última parcela), com início/fim, pausa e atalhos prontos. |
-| **Painel** | **Ganhos do mês**, **Gastos do mês** (lançados + automáticos) e **Saldo**, gastos por categoria, ganhos × gastos dos últimos 6 meses e resumo por morador com objetivos. |
-| **Assistente de IA** | Chat que recebe o resumo do mês. Provedores: **Claude (Anthropic)**, qualquer API **compatível com OpenAI** (OpenAI, OpenRouter, Groq, DeepSeek, Mistral, Ollama/LM Studio locais) e **Google Gemini**. |
+| **Login e senha** | Cadastro, login, "esqueci minha senha" por e-mail, troca de senha, sair de todos os dispositivos. |
+| **Casa e moradores** | O administrador cria a casa e cadastra os moradores (com ou sem login, ex.: crianças). Para dar acesso, gera um **código de convite** (uso único, 72h). |
+| **Ganhos** | Mensal (salário, com fim opcional) ou único (freela, 13º). |
+| **Objetivos em %** | Ex.: Reserva 10%, Investimentos 15%. Mostra o valor em R$ sobre a renda do mês. A soma não pode passar de 100%. |
+| **Gastos** | Descrição, valor, data, categoria e de quem é (ou "Casa", compartilhado). |
+| **Categorias** | 15 padrão já criadas em cada casa. Renomeie, exclua ou crie as suas. |
+| **Descontos automáticos** | **% da renda** (dízimo), **valor fixo** (aluguel, internet), **parcelado** (some do painel depois da última parcela), com início, fim e pausa. |
+| **Painel** | **Ganhos do mês**, **Gastos do mês** (lançados + automáticos) e **Saldo**. Também mostra gastos por categoria, ganhos × gastos dos últimos 6 meses e o resumo por morador. |
+| **Assistente de IA** | Chat sobre o mês. Provedores: **Claude (Anthropic)**, APIs **compatíveis com OpenAI** (OpenAI, OpenRouter, Groq, DeepSeek, Mistral…) e **Google Gemini**. |
 
 ### Quem pode fazer o quê
 
@@ -25,80 +35,89 @@ e um assistente de IA (Claude, ou outro provedor) que analisa as finanças da ca
 |---|---|---|
 | Ver painel e dados da casa | ✅ | ✅ |
 | Ganhos, objetivos e descontos **próprios** | ✅ | ✅ |
-| Ganhos/objetivos/descontos de **outros** moradores e da casa | ✅ | ❌ |
-| Lançar gasto próprio ou da casa | ✅ | ✅ (edita só os que lançou) |
-| Criar/renomear categorias | ✅ | ✅ |
-| Excluir categorias, gerenciar moradores, convites, IA, excluir casa | ✅ | ❌ |
+| Ganhos, objetivos e descontos de **outros** moradores e da casa | ✅ | ❌ |
+| Lançar gasto próprio ou da casa | ✅ | ✅ (edita os que lançou) |
+| Criar e renomear categorias | ✅ | ✅ |
+| Excluir categorias, gerenciar moradores e convites, configurar a IA, excluir a casa | ✅ | ❌ |
 
-## Como rodar
+Essas regras ficam **no banco** (RLS). Elas valem mesmo que alguém tente acessar a API sem passar pelo site.
 
-Pré-requisito: **Node.js 22.13 ou mais novo** (o banco usa o SQLite embutido no Node, sem compilar nada).
+---
 
-```bash
-cd controle-financeiro
-npm install
-cp .env.example .env      # no Windows: copy .env.example .env
-npm start
-```
+## Instalação (uma vez, ~20 minutos)
 
-Abra <http://127.0.0.1:3000>, clique em **Cadastre-se**, crie a casa e adicione os moradores.
+### 1. Supabase (banco + login)
 
-Outros comandos:
+1. Crie uma conta e um projeto em <https://supabase.com> (plano Free). Anote a senha do banco.
+2. **SQL Editor › New query**: cole todo o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) e clique em **Run**.
+3. **Project Settings › API Keys**: copie a **Project URL** e a chave **publishable** (ou "anon").
+   Cole as duas em [`js/config.js`](js/config.js).
+   ⚠️ Nunca use a chave `service_role` / `sb_secret_...` no site. O app se recusa a funcionar com ela.
+4. **Authentication › Sign In / Providers › Email**:
+   - deixe **Confirm email** ligado;
+   - **Minimum password length**: `10`; **Password requirements**: *letters and digits*.
+5. **Authentication › URL Configuration**:
+   - **Site URL**: o endereço do Pages (passo 2), ex.: `https://SEU-USUARIO.github.io/controle-financeiro/`;
+   - em **Redirect URLs**, adicione o mesmo endereço.
+6. Depois que a família tiver criado as contas, desligue **Allow new users to sign up**
+   (Authentication › Sign In / Providers). Quem já tem conta continua entrando normalmente.
 
-```bash
-npm run dev     # reinicia sozinho ao salvar arquivos
-npm test        # testes automáticos (cálculos + segurança)
-npm run audit   # verifica vulnerabilidades nas dependências
-```
+### 2. GitHub Pages (site)
 
-### Conectar o Claude
+1. Envie esta pasta para um repositório no GitHub chamado `controle-financeiro`. Ele precisa ser
+   **público** para o Pages ser grátis; o código não tem nenhum segredo.
+2. **Settings › Pages › Build and deployment**: *Deploy from a branch* → `main` → `/ (root)` → **Save**.
+3. Em 1 a 2 minutos o site abre em `https://SEU-USUARIO.github.io/controle-financeiro/`.
 
-1. Crie uma chave de API em <https://console.anthropic.com>.
-2. No sistema, como administrador: **Assistente IA → Provedor: Claude (Anthropic)**, cole a chave e salve.
-   O modelo padrão é `claude-opus-5-5`; você pode trocar (ex.: `claude-sonnet-5-5`, `claude-haiku-5-5` para gastar menos).
-3. Pergunte, por exemplo: *"Onde estou gastando mais este mês?"* ou *"Consigo bater meus objetivos?"*
+### 3. Assistente de IA (opcional)
 
-Outros provedores: escolha **Compatível com OpenAI** e informe a URL base (ex.: `https://openrouter.ai/api/v1`,
-`https://api.groq.com/openai/v1`) ou **Google Gemini**. Para Ollama local, defina `ALLOW_LOCAL_AI=true` e use
-`http://localhost:11434/v1` (chave pode ficar vazia).
+A chave de API não pode ficar no site, então ela vai para uma **Edge Function** do Supabase.
+
+1. Gere a chave de criptografia (guarde uma cópia no seu gerenciador de senhas):
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+2. No Supabase, **Edge Functions › Secrets**: crie `APP_ENCRYPTION_KEY` com esse valor.
+   Opcional: `AI_REQUESTS_PER_HOUR` (padrão 30 perguntas por pessoa por hora).
+3. **Edge Functions › Deploy a new function › Via Editor**: nome `ai`. Cole o conteúdo de
+   [`supabase/functions/ai/index.ts`](supabase/functions/ai/index.ts) e publique com **Verify JWT ligado**.
+   Pelo terminal, o equivalente é `supabase functions deploy ai`.
+4. Crie uma chave do Claude em <https://console.anthropic.com>.
+5. No site, como administrador: **Assistente IA › Claude (Anthropic)**, cole a chave e salve.
+   O modelo padrão é `claude-opus-5-5`. Para gastar menos, use `claude-sonnet-5-5` ou `claude-haiku-5-5`.
+
+Outros provedores:
+- **Compatível com OpenAI**: informe a URL base, ex.: `https://openrouter.ai/api/v1` ou `https://api.groq.com/openai/v1`.
+- **Google Gemini**: só a chave.
 
 > O que vai para a IA: nomes dos moradores, ganhos, gastos, categorias, objetivos e descontos do mês escolhido.
 > **E-mails e senhas nunca são enviados.**
 
-## Colocar em produção (acesso pela internet)
+---
 
-1. Gere a chave de criptografia e coloque no `.env`:
-   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-2. No `.env`: `NODE_ENV=production`, `COOKIE_SECURE=true`, `TRUST_PROXY=true`, `ALLOW_REGISTRATION=false`
-   (depois de criar as contas).
-3. Rode atrás de um proxy reverso com **HTTPS** — o jeito mais simples é o [Caddy](https://caddyserver.com):
-   ```
-   financas.seudominio.com.br {
-       reverse_proxy 127.0.0.1:3000
-   }
-   ```
-4. Faça **backup** do arquivo `data/financas.db` (e guarde a `APP_ENCRYPTION_KEY` em local seguro).
+## Desenvolvimento
 
-## Estrutura
+Não tem build: são arquivos estáticos. Para testar localmente, sirva a pasta com qualquer servidor estático
+(ex.: `npx serve .`) e adicione `http://localhost:3000` nas **Redirect URLs** do Supabase.
 
-```
-src/
-  server.js            inicialização
-  app.js               Express, cabeçalhos de segurança (CSP/HSTS), rotas
-  config.js            variáveis de ambiente
-  db.js                esquema SQLite
-  middleware.js        autenticação, autorização por casa, CSRF, erros
-  validate.js          validação de todas as entradas
-  routes/auth.js       cadastro, login, senha, criar/entrar em casa
-  routes/house.js      moradores, ganhos, objetivos, gastos, categorias, descontos, painel, IA
-  services/finance.js  cálculos do mês (ganhos, gastos, dízimo, parcelas, objetivos)
-  services/ai.js       Claude (SDK oficial), compatível com OpenAI, Gemini
-  security/            senha (scrypt), sessão, criptografia, rate limit, anti-SSRF
-public/                front-end (HTML/CSS/JS puro, sem CDN)
-tests/                 testes automáticos
+```bash
+npm test                                   # cálculos (ganhos, gastos, dízimo, parcelas, objetivos)
+npm i --no-save @electric-sql/pglite@0.3.14
+npm run test:db                            # regras de segurança do banco (RLS), sem Docker
 ```
 
-Valores em dinheiro são guardados em **centavos (inteiros)** e percentuais em **pontos-base** (1000 = 10%),
-para não haver erro de arredondamento.
+```
+index.html, css/, icon.svg   página e estilos
+js/config.js                 URL e chave publicável do Supabase
+js/api.js                    cliente Supabase e mensagens de erro
+js/app.js                    telas
+js/finance.js                cálculos do mês (puro, testado)
+js/charts.js, js/ui.js       gráficos SVG e utilitários (sem innerHTML)
+supabase/schema.sql          tabelas, RLS, funções (create_house, create_invite, join_house)
+supabase/functions/ai/       Edge Function da IA (chave criptografada, anti-SSRF, limite de uso)
+tests/                       testes dos cálculos e das regras do banco
+```
 
-Veja a análise de segurança completa em [SECURITY.md](SECURITY.md).
+Valores em dinheiro ficam em **centavos (inteiros)** e percentuais em **pontos-base** (1000 = 10%), para não haver erro de arredondamento.
+
+Análise de segurança: [SECURITY.md](SECURITY.md).

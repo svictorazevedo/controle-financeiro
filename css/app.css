@@ -186,3 +186,6 @@ tr.total td { font-weight: 700; border-bottom: none; }
   .brand span { display: none; }
 }
 .chart path { pointer-events: none; }
+.presets { justify-content: flex-start; flex-wrap: wrap; margin-bottom: .75rem; }
+.presets .hint { margin: 0 .25rem 0 0; align-self: center; }
+[hidden] { display: none !important; }

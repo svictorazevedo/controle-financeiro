@@ -1,61 +1,60 @@
 # Análise de segurança
 
-Este documento lista as ameaças consideradas, como o sistema se defende de cada uma e o que ainda depende
-de quem hospeda. Os itens marcados com 🧪 têm teste automático em `tests/api.test.js` (`npm test`).
+**Arquitetura:** site estático (GitHub Pages) + Supabase (Auth, Postgres e Edge Function).
+
+Não existe servidor próprio, e o código do site é público. Isso exige três coisas:
+
+- **Toda regra de acesso fica no banco** (Row Level Security). O site só exibe o que o banco deixa ler.
+- **Segredos nunca ficam no site.** A chave publicável do Supabase é pública por natureza; a chave de IA fica na Edge Function.
+- **Supor que o atacante chama a API diretamente**, sem passar pelas telas.
+
+Os itens com 🧪 são verificados pelos testes:
+- `npm run test:db`: 29 verificações das regras do banco;
+- `npm test`: cálculos.
 
 ## 1. Ameaças e defesas
 
-| # | Ameaça | Defesa implementada | Onde |
+| # | Ameaça | Defesa | Onde |
 |---|---|---|---|
-| 1 | **Senhas vazadas do banco** | Hash **scrypt** (memory-hard, ~32 MB por tentativa) com sal aleatório; comparação em tempo constante. Senha nunca é guardada nem registrada em log. | `security/password.js` |
-| 2 | **Força bruta / adivinhar senha** 🧪 | Limite por IP (20 tentativas / 15 min) + **bloqueio da conta por 15 min após 5 erros**. Política de senha: mínimo 10 caracteres, bloqueia senhas comuns e senhas com o e-mail. | `routes/auth.js` |
-| 3 | **Descobrir quais e-mails têm conta** 🧪 | Login responde a mesma mensagem e no mesmo tempo (hash "falso") para e-mail inexistente ou senha errada. | `routes/auth.js` |
-| 4 | **Roubo de sessão** 🧪 | Token aleatório de 256 bits em cookie **HttpOnly** (JavaScript não lê), **SameSite=Strict**, **Secure** + prefixo `__Host-` em produção. No banco só fica o SHA-256 do token. Sessão expira por inatividade (12h) e por idade máxima (7 dias). Token novo a cada login (evita fixação). Troca de senha derruba as outras sessões. | `security/session.js` |
-| 5 | **CSRF** (site malicioso agindo em seu nome) 🧪 | Três camadas: cookie SameSite=Strict; exigência de `Content-Type: application/json` (formulário HTML não consegue enviar); verificação do cabeçalho `Origin`; token **X-CSRF-Token** por sessão em toda alteração. | `middleware.js` |
-| 6 | **Ver/alterar dados de outra casa** (IDOR) 🧪 | Toda rota `/api/houses/:id` confirma que o usuário é morador da casa; todas as consultas filtram por `house_id`; IDs de morador/categoria enviados no corpo também são validados contra a casa. Responde 404 para não revelar se a casa existe. | `middleware.js`, `routes/house.js` |
-| 7 | **Morador alterar dados de outro** 🧪 | Papéis admin/morador; morador comum só mexe nos próprios ganhos, objetivos e descontos e nos gastos que lançou. Não é possível remover o último administrador. | `routes/house.js` |
-| 8 | **SQL injection** | 100% das consultas usam *prepared statements* com parâmetros; nenhuma SQL é montada com texto do usuário. | todo `src/` |
-| 9 | **XSS** (injetar script em uma descrição) | Front-end insere textos só com `textContent` (nunca `innerHTML`); **Content-Security-Policy** só permite scripts do próprio site, sem inline, sem CDN; `frame-ancestors 'none'`. | `public/js/ui.js`, `app.js` |
-| 10 | **Clickjacking, sniffing, vazamento de URL** 🧪 | Helmet: `X-Frame-Options`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, HSTS em produção, `Permissions-Policy`, sem `X-Powered-By`. API com `Cache-Control: no-store`. | `app.js` |
-| 11 | **Vazamento das chaves de API de IA** 🧪 | Chaves criptografadas com **AES-256-GCM** (chave mestra no `.env`, fora do banco e do git). Nunca são devolvidas ao navegador (só os 4 últimos caracteres). Chamadas à IA partem do servidor. | `security/crypto.js`, `routes/house.js` |
-| 12 | **SSRF** (usar o servidor para acessar a rede interna via "URL base" da IA) 🧪 | Exige HTTPS; resolve o DNS e bloqueia IPs privados, loopback, link-local e o endereço de metadados de nuvem (169.254.169.254); não segue redirecionamentos; localhost só com `ALLOW_LOCAL_AI=true`. | `security/urlGuard.js` |
-| 13 | **Prompt injection** (descrição de gasto tentando comandar a IA) | Dados enviados dentro de `<dados_financeiros>` com instrução explícita de que são dados. A IA não tem ferramentas nem acesso ao banco: no pior caso, só responde algo estranho. Resposta exibida como texto puro. | `services/ai.js` |
-| 14 | **Abuso de custo da IA** | Limite de perguntas por usuário por hora (`AI_REQUESTS_PER_HOUR`), histórico limitado a 20 mensagens de até 4.000 caracteres. | `routes/house.js` |
-| 15 | **Entrada maliciosa / gigante** | Corpo JSON limitado a 100 KB; validação de tipo, formato e tamanho de cada campo; valores em centavos inteiros com limites; caracteres de controle removidos. | `validate.js` |
-| 16 | **Vazamento de detalhes internos** | Erros 500 retornam mensagem genérica; stack trace só no log do servidor. | `middleware.js` |
-| 17 | **Cadastro de estranhos** | `ALLOW_REGISTRATION=false` fecha o cadastro; novas contas só com código de convite (uso único, 72h, guardado como hash). | `routes/auth.js` |
-| 18 | **Segredos no git** | `.gitignore` exclui `.env`, `data/`, `*.db` e `*.key`. | `.gitignore` |
-| 19 | **Dependências vulneráveis** | Apenas 3 dependências diretas (express, helmet, SDK oficial da Anthropic); `npm audit` sem vulnerabilidades na criação. | `package.json` |
-| 20 | **Rastro de ações** | Log de auditoria: login, falhas, bloqueios, troca de senha, convites, exclusões, mudança da IA. | tabela `audit_log` |
+| 1 | **Senhas vazadas** | Gerenciadas pelo Supabase Auth (hash bcrypt). O banco do app nunca vê a senha. | Supabase Auth |
+| 2 | **Senha fraca** | Mínimo 10 caracteres com letras e números, conferido no site **e** no Supabase (passo 1.4 do README). | `js/app.js`, painel |
+| 3 | **Força bruta no login** | Limites de taxa do Supabase Auth por IP. Mensagem única para e-mail inexistente ou senha errada. Opcional: CAPTCHA (seção 2). | Supabase Auth |
+| 4 | **Estranhos criando conta** | Confirmação de e-mail obrigatória. Depois de criar as contas da família, desligue "Allow new users to sign up". Uma conta nova **não vê nada** sem convite. 🧪 | painel, RLS |
+| 5 | **Ver ou alterar dados de outra casa** 🧪 | RLS em todas as tabelas: só quem é morador da casa (`is_member`) lê. Chaves estrangeiras compostas `(id, house_id)` impedem ligar um gasto a uma categoria ou morador de outra casa. Um registro nunca muda de casa (gatilho). | `schema.sql` |
+| 6 | **Morador mexer nos dados de outro** 🧪 | Papéis admin/morador no banco. O morador só altera os próprios ganhos, objetivos e descontos e os gastos que lançou; não promove a si mesmo; não cria descontos da casa. | `schema.sql` |
+| 7 | **Forjar autoria de gasto** 🧪 | Um gatilho preenche `created_by` com o usuário logado, ignorando o que o site enviar. | `schema.sql` |
+| 8 | **Entrar numa casa sem convite** 🧪 | Vincular uma conta a um morador só é possível por `join_house` (o gatilho bloqueia UPDATE direto). O código tem 48 bits aleatórios, vale 72h, é de **uso único** e fica salvo só como hash SHA-256 (moradores comuns nem veem os hashes). Limite de 10 tentativas por hora por usuário. | `schema.sql` |
+| 9 | **Casa sem administrador** 🧪 | Gatilho impede rebaixar ou remover o último admin com login. | `schema.sql` |
+| 10 | **Visitante não logado** 🧪 | O papel `anon` não tem permissão em nenhuma tabela nem função. | `schema.sql` |
+| 11 | **Vazamento da chave de IA** 🧪 | A chave vai direto para a Edge Function e é criptografada com **AES-256-GCM**. O id da casa entra como dado autenticado, então a chave cifrada não funciona se copiada para outra casa. Fica em `ai_secrets`, tabela sem nenhuma política RLS: nem o admin lê pelo site. O navegador só vê os 4 últimos caracteres. A chave mestra fica nos *Secrets* da função. | `functions/ai`, `schema.sql` |
+| 12 | **SSRF** (usar a "URL base" para atacar a rede do Supabase) | Exige HTTPS. Resolve o DNS e bloqueia IPs privados, loopback, link-local e metadados de nuvem. Não segue redirecionamentos. | `functions/ai` |
+| 13 | **Abuso de custo da IA** | 30 perguntas por hora por usuário (configurável). Histórico de até 20 mensagens de 4.000 caracteres; contexto até 40 mil caracteres; corpo até 100 KB. | `functions/ai` |
+| 14 | **Prompt injection** (uma descrição de gasto tentando comandar a IA) | Dados enviados dentro de `<dados_financeiros>` com instrução explícita de que são dados. A IA não tem ferramentas nem acesso ao banco; a resposta é exibida como texto puro. | `functions/ai` |
+| 15 | **XSS** (script escondido numa descrição) | O site insere textos só com `textContent` (nunca `innerHTML`). A **Content-Security-Policy** só permite scripts do próprio site e do supabase-js, sem script inline. | `js/ui.js`, `index.html` |
+| 16 | **SQL injection** | Não há SQL montado com texto: o PostgREST usa parâmetros, e as funções são PL/pgSQL com variáveis. Funções `SECURITY DEFINER` usam `search_path = ''`. | `schema.sql` |
+| 17 | **Chave secreta do Supabase no site** | O app se recusa a funcionar se `js/config.js` tiver uma chave `service_role`/`sb_secret_`. | `js/api.js` |
+| 18 | **Valores absurdos** | `CHECK` no banco: dinheiro > 0 e ≤ R$ 100 mi, percentuais de 0,01% a 100%, meses `AAAA-MM`, textos com tamanho máximo, parcelas de 1 a 600. 🧪 | `schema.sql` |
 
-## 2. Responsabilidades de quem hospeda (obrigatório em produção)
+## 2. Recomendações (dependem de você, no painel)
 
-O código não resolve sozinho estes pontos:
-
-1. **HTTPS sempre.** Rode atrás de Caddy/nginx com certificado e defina `COOKIE_SECURE=true` e `TRUST_PROXY=true`.
-   Sem HTTPS, senha e cookie trafegam abertos na rede.
-2. **`APP_ENCRYPTION_KEY` forte e guardada fora do servidor** (gerenciador de senhas). Se o servidor e o `.env`
-   vazarem juntos, as chaves de IA podem ser lidas — revogue-as no painel do provedor nesse caso.
-3. **Feche o cadastro** (`ALLOW_REGISTRATION=false`) depois de criar as contas da família.
-4. **Backup criptografado** do `data/financas.db` em outro lugar; teste a restauração.
-5. **Atualize** o Node.js e rode `npm audit` / `npm update` periodicamente.
-6. **Firewall**: deixe aberta só a porta 443 (e 80 para o certificado). O app escuta em `127.0.0.1` por padrão.
-7. **Repositório privado** no GitHub se ele contiver qualquer configuração sua (o código em si não tem segredos).
+1. **Desligue o cadastro aberto** depois de criar as contas (README 1.6).
+2. **CAPTCHA no login e no cadastro**: em Authentication › Attack Protection, ligue o Cloudflare Turnstile (grátis).
+   Se quiser, eu adapto o site para enviar o token, como no `louvorganize`.
+3. **Ative a autenticação em dois fatores (MFA/TOTP)** do Supabase. O site ainda não tem a tela de MFA; dá para adicionar.
+4. **Guarde a `APP_ENCRYPTION_KEY`** num gerenciador de senhas. Se ela vazar, gere outra e cadastre as chaves de IA de novo.
+5. **Backup:** o plano grátis do Supabase **não** tem backup diário. Exporte periodicamente
+   (Database › Backups, ou `pg_dump` com a connection string).
+6. **Chave de IA com limite de gasto**: no console da Anthropic, defina um teto mensal de cobrança.
 
 ## 3. Limitações conhecidas
 
-- **Sem 2FA** (autenticação em dois fatores). É a melhoria mais valiosa a fazer a seguir (TOTP com app autenticador).
-- **Sem recuperação de senha por e-mail** (precisa de um serviço de envio de e-mail). Hoje, se alguém esquecer a senha,
-  o administrador do servidor precisa redefini-la direto no banco.
-- **Cadastro revela se o e-mail já existe** (mensagem de conflito). Com o cadastro fechado (`ALLOW_REGISTRATION=false`), o risco é mínimo.
-- **Rate limit em memória**: vale para uma instância só; reiniciar o servidor zera os contadores. Com várias instâncias, use Redis.
-- **Bloqueio de conta** pode ser usado para incomodar um usuário (errar a senha dele 5 vezes); o bloqueio dura só 15 minutos.
-- **Dados ficam em texto no SQLite** (exceto senhas e chaves de IA). Proteja o arquivo do banco e o disco (BitLocker/LUKS).
-- **Dados enviados à IA** saem do servidor e vão para o provedor escolhido, sujeitos à política de privacidade dele.
-
-## 4. Como verificar
-
-```bash
-npm test         # 10 testes: login, bloqueio, CSRF, IDOR, permissões, criptografia da chave, SSRF, cabeçalhos, cálculos
-npm run audit    # vulnerabilidades em dependências
-```
+- **Sessão no `localStorage`** (padrão do supabase-js): um XSS conseguiria ler o token. A defesa é não ter XSS:
+  `textContent` + CSP. A sessão expira e pode ser encerrada em "Sair de todos os dispositivos".
+- **Biblioteca do Supabase vem do CDN jsDelivr** (versão fixa, 2.118.0). Para eliminar essa dependência,
+  dá para copiar o arquivo para dentro do repositório.
+- **GitHub Pages não permite cabeçalhos HTTP próprios.** A CSP vai em `<meta>`, e `frame-ancestors`
+  (anti-clickjacking) não funciona por meta. O risco é baixo: as ações sensíveis pedem confirmação.
+- **O repositório é público** (exigência do Pages grátis). Não há segredos nele; quem protege os dados é o RLS.
+- **Dados financeiros ficam em texto** no Postgres do Supabase (criptografado em disco pelo provedor).
+  Quem tem acesso ao painel do projeto vê tudo: proteja sua conta do Supabase com 2FA.
+- **Dados enviados à IA** vão para o provedor escolhido e seguem a política de privacidade dele.
