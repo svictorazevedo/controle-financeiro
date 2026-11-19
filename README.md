@@ -80,8 +80,9 @@ A chave de API não pode ficar no site, então ela vai para uma **Edge Function*
 2. No Supabase, **Edge Functions › Secrets**: crie `APP_ENCRYPTION_KEY` com esse valor.
    Opcional: `AI_REQUESTS_PER_HOUR` (padrão 30 perguntas por pessoa por hora).
 3. **Edge Functions › Deploy a new function › Via Editor**: nome `ai`. Cole o conteúdo de
-   [`supabase/functions/ai/index.ts`](supabase/functions/ai/index.ts) e publique com **Verify JWT ligado**.
-   Pelo terminal, o equivalente é `supabase functions deploy ai`.
+   [`supabase/functions/ai/index.ts`](supabase/functions/ai/index.ts) e publique. Em **Settings** da função,
+   deixe **Verify JWT with legacy secret** desligado (recomendação do Supabase): a própria função confere o login
+   com `auth.getUser()` e recusa quem não está logado. Pelo terminal: `supabase functions deploy ai --no-verify-jwt`.
 4. Crie uma chave do Claude em <https://console.anthropic.com>.
 5. No site, como administrador: **Assistente IA › Claude (Anthropic)**, cole a chave e salve.
    O modelo padrão é `claude-opus-5-5`. Para gastar menos, use `claude-sonnet-5-5` ou `claude-haiku-5-5`.

@@ -14,7 +14,7 @@
 //   APP_ENCRYPTION_KEY  — 64 caracteres hex (32 bytes). Gere: openssl rand -hex 32
 //   AI_REQUESTS_PER_HOUR — opcional (padrão 30 perguntas por usuário por hora)
 // SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY já vêm prontos.
-// Publique com "Verify JWT" LIGADO.
+// "Verify JWT with legacy secret" pode ficar DESLIGADO: o login é conferido abaixo com auth.getUser().
 import Anthropic from 'npm:@anthropic-ai/sdk@1.10.0';
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 
@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
   try {
-    // Quem está chamando? (o token vem do login do site; o Supabase já validou a assinatura)
+    // Quem está chamando? getUser() valida o token no servidor de Auth; sem login válido, 401.
     const auth = req.headers.get('Authorization') ?? '';
     const userClient = createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
     const { data: { user } } = await userClient.auth.getUser();
