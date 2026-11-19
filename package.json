@@ -1,0 +1,23 @@
+{
+  "name": "controle-financeiro",
+  "version": "1.0.0",
+  "description": "Controle financeiro doméstico com login, moradores, objetivos, gastos, descontos automáticos e assistente de IA",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js",
+    "audit": "npm audit --omit=dev"
+  },
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "express": "^4.22.3",
+    "helmet": "^8.3.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "UNLICENSED"
+}

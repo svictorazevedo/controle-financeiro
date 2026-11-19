@@ -1,0 +1,19 @@
+# Dependências
+node_modules/
+
+# Dados e segredos — NUNCA versionar
+data/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
+*.key
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+npm-debug.log*
