@@ -101,7 +101,7 @@ A chave de API não pode ficar no site, então ela vai para uma **Edge Function*
 
 Outros provedores:
 - **Compatível com OpenAI**: informe a URL base, ex.: `https://openrouter.ai/api/v1` ou `https://api.groq.com/openai/v1`.
-- **Google Gemini**: só a chave.
+- **Google Gemini** (plano gratuito, sem cartão): crie a chave em <https://aistudio.google.com/apikey> e use o modelo `gemini-3.8-flash`.
 
 > O que vai para a IA: nomes dos moradores, ganhos, gastos, categorias, objetivos e descontos do mês escolhido.
 > **E-mails e senhas nunca são enviados.**

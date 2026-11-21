@@ -8,7 +8,7 @@ import { icon } from '../icons.js';
 export const PROVIDERS = {
   anthropic: { label: 'Claude (Anthropic)', defaultModel: 'claude-opus-5-5' },
   openai: { label: 'Compatível com OpenAI (OpenAI, OpenRouter, Groq, DeepSeek...)', defaultModel: 'gpt-4o-mini', defaultBaseUrl: 'https://api.openai.com/v1' },
-  gemini: { label: 'Google Gemini', defaultModel: 'gemini-2.5-flash' },
+  gemini: { label: 'Google Gemini (tem plano gratuito)', defaultModel: 'gemini-3.8-flash' },
 };
 
 const SUGGESTIONS = ['Onde estou gastando mais este mês?', 'Consigo cumprir minhas metas no prazo?', 'Quais categorias passaram do orçamento?', 'Quanto posso cortar em lazer?'];
