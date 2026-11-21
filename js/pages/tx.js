@@ -110,6 +110,7 @@ export function openTxDialog(src = null, defaults = {}) {
       if (tx?.attachment_path && (uploaded || removeAttachment)) await sb.storage.from('receipts').remove([tx.attachment_path]);
     }, tx ? 'Lançamento atualizado.' : `${type === 'income' ? 'Entrada' : 'Saída'} de ${brl(amount)} lançada.`);
     if (!ok) return;
+    defaults.onSaved?.();
     if (keepOpen) {
       f.amount.querySelector('input').value = '';
       f.description.value = '';

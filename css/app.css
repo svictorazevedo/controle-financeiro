@@ -708,3 +708,31 @@ dialog.dialog[open] { animation: pop .16s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------------------------------------------------------------- lançamento por voz */
+.split-btn { display: inline-flex; }
+.split-btn .btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split-btn .voice-btn { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: .5rem .7rem; border-left: 1px solid rgb(255 255 255 / 35%); }
+.voice-stage { display: flex; flex-direction: column; align-items: center; gap: .8rem; padding: .6rem 0 1rem; text-align: center; }
+.mic {
+  width: 88px; height: 88px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+  background: var(--accent); color: #fff; box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent); transition: transform .15s, background .15s;
+}
+.mic:hover { transform: scale(1.04); }
+.mic.on { background: var(--neg); animation: pulse 1.4s ease-out infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--neg) 55%, transparent); }
+  100% { box-shadow: 0 0 0 26px transparent; }
+}
+.voice-status { margin: 0; color: var(--text-2); font-weight: 600; min-height: 1.5em; }
+.voice-text { font-size: 1.05rem; }
+.center-chips { justify-content: center; }
+.voice-quote { margin: 0; padding: .6rem .9rem; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 10px 10px 0; color: var(--text-2); font-style: italic; }
+.voice-items { list-style: none; margin: .6rem 0 0; padding: 0; display: grid; gap: .5rem; }
+.voice-item { display: flex; gap: .75rem; align-items: center; padding: .7rem .8rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.vi-main { flex: 1; min-width: 0; display: grid; gap: .25rem; }
+.vi-top { display: flex; justify-content: space-between; gap: .75rem; }
+.vi-meta { display: flex; flex-wrap: wrap; gap: .3rem .9rem; font-size: .8rem; color: var(--muted); }
+.vi-meta > span { display: inline-flex; align-items: center; gap: .25rem; }
+.vi-actions { display: flex; gap: .15rem; }
+.spinner.lg { width: 40px; height: 40px; border-width: 4px; }

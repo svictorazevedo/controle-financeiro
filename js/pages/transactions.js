@@ -4,6 +4,7 @@ import { movements, sumBy, localToday, addMonths, dateFor, addDays, topCategory 
 import { h, brl, dateBr, menuButton, segmented, monthLabel, download } from '../ui.js';
 import { icon } from '../icons.js';
 import { openTxDialog, deleteTx, viewAttachment, canChangeTx } from './tx.js';
+import { openVoiceDialog } from './voice.js';
 
 // Filtros ficam guardados enquanto o app está aberto.
 const filters = { type: 'all', preset: 'month', from: null, to: null, account: '', category: '', q: '', auto: true };
@@ -161,6 +162,7 @@ export async function renderTransactions() {
     subtitle: `${dateBr(from)} a ${dateBr(to)}`,
     actions: [
       h('button', { type: 'button', class: 'btn ghost', onclick: exportCsv }, icon('download', 18), h('span', {}, 'CSV')),
+      canEdit('lancamentos') ? h('button', { type: 'button', class: 'btn ghost', onclick: () => openVoiceDialog() }, icon('mic', 18), h('span', {}, 'Por voz')) : null,
       canEdit('lancamentos') ? h('button', { type: 'button', class: 'btn income', onclick: () => openTxDialog(null, { type: 'income' }) }, icon('arrow_in', 18), h('span', {}, 'Entrada')) : null,
       canEdit('lancamentos') ? h('button', { type: 'button', class: 'btn expense', onclick: () => openTxDialog(null, { type: 'expense' }) }, icon('arrow_out', 18), h('span', {}, 'Saída')) : null,
     ],

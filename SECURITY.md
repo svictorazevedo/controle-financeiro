@@ -39,6 +39,7 @@ Os itens com 🧪 são verificados pelos testes:
 | 21 | **Comprovante de outra casa / arquivo malicioso** 🧪 | Bucket privado `receipts`, caminho sempre `<id da casa>/<uuid>.<ext>` (conferido por `CHECK` no lançamento e pela política do Storage). Só JPG, PNG, WEBP e PDF, até 5 MB (limite no bucket). Visualização por link assinado de 2 minutos. | `schema.sql`, `js/pages/tx.js` |
 | 22 | **Logo/ícone com script** 🧪 | Só `data:image/png|jpeg|webp;base64` (SVG recusado por `CHECK`), com tamanho máximo. | `schema.sql` |
 | 23 | **CSV com fórmula** (planilha executando `=HYPERLINK(...)`) | Células de texto que começam com `= + @` ganham um apóstrofo antes. | `js/pages/reports.js`, `transactions.js` |
+| 24 | **Áudio do lançamento por voz** | Não é gravado nem enviado ao Supabase: o reconhecimento é do navegador (Web Speech API; no Chrome, processado pelo serviço de voz do Google) e o app só recebe o texto. O texto (até 1.000 caracteres) vai para a IA dentro de `<fala>`, tratado como dado. A IA só escolhe categorias/contas/pessoas da própria casa por códigos curtos e nada é gravado sem o usuário confirmar; a gravação passa pelo RLS normal. Exige "Lançamentos: editar" e conta no limite de pedidos por hora. | `js/pages/voice.js`, `functions/ai` |
 
 ## 2. Recomendações (dependem de você, no painel)
 

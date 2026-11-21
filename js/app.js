@@ -19,6 +19,7 @@ import { renderAI } from './pages/ai.js';
 import { renderSettings } from './pages/settings.js';
 import { renderAccount, renderMfaChallenge, passwordProblem } from './pages/account.js';
 import { openTxDialog } from './pages/tx.js';
+import { openVoiceDialog } from './pages/voice.js';
 
 // ---------------------------------------------------------------- tema claro/escuro
 function applyTheme(t) {
@@ -85,7 +86,9 @@ function buildShell() {
     state.chat = [];
     render();
   });
-  shell.add = h('button', { type: 'button', class: 'btn', onclick: () => openTxDialog() }, icon('plus', 18), h('span', { class: 'hide-sm' }, 'Novo lançamento'));
+  shell.add = h('div', { class: 'split-btn', role: 'group', 'aria-label': 'Novo lançamento' },
+    h('button', { type: 'button', class: 'btn', title: 'Novo lançamento (N)', onclick: () => openTxDialog() }, icon('plus', 18), h('span', { class: 'hide-sm' }, 'Novo lançamento')),
+    h('button', { type: 'button', class: 'btn voice-btn', title: 'Lançar por voz com IA (V)', 'aria-label': 'Lançar por voz com IA', onclick: () => openVoiceDialog() }, icon('mic', 18)));
   shell.theme = h('button', {
     type: 'button', class: 'icon-btn', 'aria-label': 'Alternar tema claro/escuro',
     onclick: () => {
@@ -111,10 +114,10 @@ function paintTheme() {
 function renderShell(route) {
   document.body.classList.remove('auth', 'nav-open');
   const house = state.d?.house;
-  shell.brand.replaceChildren(
-    house?.logo ? h('img', { src: house.logo, alt: house.name, class: 'brand-logo' })
-      : h('span', { class: 'brand-mark' }, house?.icon ? h('img', { src: house.icon, alt: '' }) : icon('coins', 20)),
-    house?.logo ? null : h('span', { class: 'brand-text' }, h('strong', {}, house?.name ?? 'Controle Financeiro'), h('small', {}, 'Controle financeiro')));
+  shell.brand.replaceChildren(...(house?.logo
+    ? [h('img', { src: house.logo, alt: house.name, class: 'brand-logo' })]
+    : [h('span', { class: 'brand-mark' }, house?.icon ? h('img', { src: house.icon, alt: '' }) : icon('coins', 20)),
+      h('span', { class: 'brand-text' }, h('strong', {}, house?.name ?? 'Controle Financeiro'), h('small', {}, 'Controle financeiro'))]));
   clear(shell.nav);
   let group = null;
   let list = null;
@@ -337,11 +340,12 @@ async function start(hash) {
 buildShell();
 window.addEventListener('hashchange', render);
 document.addEventListener('keydown', (e) => {
-  // Atalho: "n" abre novo lançamento (fora de campos de texto)
-  if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea|select/i.test(document.activeElement?.tagName ?? '')
+  // Atalhos: "n" novo lançamento, "v" lançamento por voz (fora de campos de texto)
+  if ((e.key === 'n' || e.key === 'v') && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea|select/i.test(document.activeElement?.tagName ?? '')
     && !document.querySelector('dialog[open]') && state.d && canEdit('lancamentos')) {
     e.preventDefault();
-    openTxDialog();
+    if (e.key === 'v') openVoiceDialog();
+    else openTxDialog();
   }
 });
 if (configured) {
