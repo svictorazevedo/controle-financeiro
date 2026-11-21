@@ -1,17 +1,17 @@
 # 💰 Controle Financeiro
 
-Controle financeiro doméstico: cadastre a casa e os moradores, informe quanto cada um ganha e seus objetivos em
-percentual, lance os gastos por categoria e deixe os descontos automáticos (dízimo, aluguel, parcelas, assinaturas)
-entrarem sozinhos todo mês. O painel mostra **ganhos do mês** e **gastos do mês**, e um assistente de IA (Claude ou
-outro provedor) analisa as finanças da casa.
+Sistema de controle financeiro para casa ou pequena empresa: contas bancárias e carteiras com saldo automático,
+lançamentos de entradas e saídas com comprovante, orçamento por categoria, metas de economia, calendário,
+8 relatórios (PDF, CSV e impressão), assistente de IA, usuários com permissão por tela e verificação em duas etapas.
 
-**Custo: R$ 0.** Site estático no **GitHub Pages** + login e banco no **Supabase** (plano gratuito).
+**Custo: R$ 0.** Site estático no **GitHub Pages** + login, banco e arquivos no **Supabase** (plano gratuito).
 
 ```
 Navegador ──► GitHub Pages (HTML + JS, estático)
     │
-    ├──► Supabase Auth ........ login, senha, recuperação por e-mail
+    ├──► Supabase Auth ........ login, senha, recuperação por e-mail, 2FA (app autenticador)
     ├──► Supabase Postgres .... dados, protegidos por RLS (supabase/schema.sql)
+    ├──► Supabase Storage ..... comprovantes (bucket privado "receipts")
     └──► Edge Function "ai" ... guarda a chave de IA criptografada e chama Claude / OpenAI / Gemini
 ```
 
@@ -19,28 +19,38 @@ Navegador ──► GitHub Pages (HTML + JS, estático)
 
 | Área | O que faz |
 |---|---|
-| **Login e senha** | Cadastro, login, "esqueci minha senha" por e-mail, troca de senha, sair de todos os dispositivos. |
-| **Casa e moradores** | O administrador cria a casa e cadastra os moradores (com ou sem login, ex.: crianças). Para dar acesso, gera um **código de convite** (uso único, 72h). |
-| **Ganhos** | Mensal (salário, com fim opcional) ou único (freela, 13º). |
-| **Objetivos em %** | Ex.: Reserva 10%, Investimentos 15%. Mostra o valor em R$ sobre a renda do mês. A soma não pode passar de 100%. |
-| **Gastos** | Descrição, valor, data, categoria e de quem é (ou "Casa", compartilhado). |
-| **Categorias** | 15 padrão já criadas em cada casa. Renomeie, exclua ou crie as suas. |
-| **Descontos automáticos** | **% da renda** (dízimo), **valor fixo** (aluguel, internet), **parcelado** (some do painel depois da última parcela), com início, fim e pausa. |
-| **Painel** | **Ganhos do mês**, **Gastos do mês** (lançados + automáticos) e **Saldo**. Também mostra gastos por categoria, ganhos × gastos dos últimos 6 meses e o resumo por morador. |
-| **Assistente de IA** | Chat sobre o mês. Provedores: **Claude (Anthropic)**, APIs **compatíveis com OpenAI** (OpenAI, OpenRouter, Groq, DeepSeek, Mistral…) e **Google Gemini**. |
+| **Painel** | Saldo consolidado das contas; entradas, saídas e resultado do mês (com variação sobre o mês anterior); indicadores do dia (entradas, saídas, a pagar em 7 dias); gráfico de entradas x saídas dos últimos 6 meses; mini calendário; resumo do orçamento; metas em andamento; saídas por categoria; últimos lançamentos. |
+| **Lançamentos** | Entradas e saídas com data, conta, categoria, de quem é e **comprovante** (foto ou PDF, até 5 MB). Filtros por tipo, período, conta, categoria e busca. Editar, duplicar, excluir, exportar CSV. Atalho: tecla **N**. |
+| **Contas** | Conta corrente, poupança, carteira, cartão de crédito, investimento. Saldo calculado sozinho (saldo inicial + movimentos), previsto para o fim do mês, extrato. |
+| **Fixos e recorrentes** | Rendas fixas (salário) e descontos automáticos: **% da renda** (dízimo), **valor fixo** (aluguel, internet), **parcelado** (some depois da última parcela). Entram sozinhos no dia do mês informado. Também a distribuição da renda em %. |
+| **Categorias** | De entrada e de saída, com **subcategorias** e **cor**. 15 de saída e 5 de entrada já vêm criadas. |
+| **Orçamento** | Limite de gasto por categoria (todo mês ou só num mês), planejado x realizado com alerta de estouro, comparação com o mês anterior. |
+| **Metas** | Valor e data-alvo, aportes e retiradas, progresso, quanto guardar por mês para cumprir o prazo. |
+| **Relatórios** | 8 prontos: entradas, saídas, entradas x saídas mensal, próximas entradas, próximas saídas, totais mensais (12 meses), extrato por conta, saídas por categoria. **PDF, CSV e impressão.** |
+| **Calendário** | Mês inteiro com total de entradas e saídas por dia, resumo do mês e detalhe do dia. |
+| **Usuários** | Administradores e colaboradores (com ou sem login). **Permissão por tela**: sem acesso, ver ou editar. |
+| **Segurança** | Verificação em duas etapas (app autenticador). Quem ativa só acessa os dados com o código. |
+| **Configuração** | Nome, **moeda**, **logo** e **ícone** próprios; tema claro/escuro. |
+| **Assistente de IA** | Chat sobre o mês: **Claude (Anthropic)**, APIs compatíveis com OpenAI e **Google Gemini**. |
 
 ### Quem pode fazer o quê
 
-| Ação | Administrador | Morador com login |
-|---|---|---|
-| Ver painel e dados da casa | ✅ | ✅ |
-| Ganhos, objetivos e descontos **próprios** | ✅ | ✅ |
-| Ganhos, objetivos e descontos de **outros** moradores e da casa | ✅ | ❌ |
-| Lançar gasto próprio ou da casa | ✅ | ✅ (edita os que lançou) |
-| Criar e renomear categorias | ✅ | ✅ |
-| Excluir categorias, gerenciar moradores e convites, configurar a IA, excluir a casa | ✅ | ❌ |
+**Administrador**: tudo, inclusive usuários, permissões, configurações e exclusão da casa.
 
-Essas regras ficam **no banco** (RLS). Elas valem mesmo que alguém tente acessar a API sem passar pelo site.
+**Colaborador**: o administrador escolhe, tela por tela, *sem acesso*, *ver* ou *editar*. Padrão:
+
+| Tela | Padrão | Observação |
+|---|---|---|
+| Painel, Calendário, Relatórios, Assistente IA | ver | |
+| Lançamentos | editar | lança para si ou para a casa; altera os que lançou ou os seus |
+| Fixos e recorrentes | editar | só os próprios; os da casa são do admin |
+| Categorias | editar | criar e renomear; excluir é só do admin |
+| Metas | editar | |
+| Contas, Orçamento | ver | |
+
+Essas regras ficam **no banco** (RLS), não só nas telas: valem mesmo que alguém chame a API do Supabase direto.
+Como Painel, Contas, Calendário e Relatórios são calculados a partir dos lançamentos, quem tem "ver" em qualquer
+uma dessas telas consegue ler os lançamentos. Para esconder os valores de alguém, tire o acesso de todas elas.
 
 ---
 
@@ -50,6 +60,7 @@ Essas regras ficam **no banco** (RLS). Elas valem mesmo que alguém tente acessa
 
 1. Crie uma conta e um projeto em <https://supabase.com> (plano Free). Anote a senha do banco.
 2. **SQL Editor › New query**: cole todo o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) e clique em **Run**.
+   Ele cria as tabelas, as regras de acesso e o bucket privado de comprovantes.
 3. **Project Settings › API Keys**: copie a **Project URL** e a chave **publishable** (ou "anon").
    Cole as duas em [`js/config.js`](js/config.js).
    ⚠️ Nunca use a chave `service_role` / `sb_secret_...` no site. O app se recusa a funcionar com ela.
@@ -96,25 +107,49 @@ Outros provedores:
 
 ---
 
+## Atualizar da versão 1 (quem já usa o sistema)
+
+A versão 2 muda o banco. **Siga esta ordem**: se o site novo for publicado antes do passo 1, ele não abre.
+
+1. **Supabase › SQL Editor › New query**: cole [`supabase/migrations/002_v2.sql`](supabase/migrations/002_v2.sql) e clique em **Run**.
+   Roda numa transação (se der erro, nada muda). Os gastos antigos viram lançamentos de saída na nova
+   "Conta principal"; as rendas e descontos também ficam nela; cada casa ganha as categorias de entrada.
+   Depois, ajuste o **saldo inicial** das contas em *Contas* para o saldo bater com o do banco.
+2. **Edge Functions › ai**: cole de novo o conteúdo de [`supabase/functions/ai/index.ts`](supabase/functions/ai/index.ts) e publique
+   (agora ela respeita a permissão "Assistente IA" e o 2FA). Pelo terminal: `supabase functions deploy ai --no-verify-jwt`.
+3. Envie o código novo para o GitHub (`git push`). Em 1 a 2 minutos o Pages publica.
+
+**2FA**: o TOTP (app autenticador) vem ligado por padrão no Supabase. Confira em *Authentication › Multi-Factor*.
+Cada pessoa ativa em **Minha conta › Verificação em duas etapas**.
+
+---
+
 ## Desenvolvimento
 
 Não tem build: são arquivos estáticos. Para testar localmente, sirva a pasta com qualquer servidor estático
 (ex.: `npx serve .`) e adicione `http://localhost:3000` nas **Redirect URLs** do Supabase.
 
 ```bash
-npm test                                   # cálculos (ganhos, gastos, dízimo, parcelas, objetivos)
+npm test                                   # cálculos, relatórios e PDF
 npm i --no-save @electric-sql/pglite@0.3.14
-npm run test:db                            # regras de segurança do banco (RLS), sem Docker
+npm run test:db                            # regras do banco (RLS, permissões, 2FA, comprovantes), sem Docker
+npm run test:migration                     # migração v1 -> v2 com dados antigos
 ```
 
 ```
-index.html, css/, icon.svg   página e estilos
+index.html, css/, icon.svg   página e estilos (tema claro/escuro, responsivo, impressão)
 js/config.js                 URL e chave publicável do Supabase
 js/api.js                    cliente Supabase e mensagens de erro
-js/app.js                    telas
-js/finance.js                cálculos do mês (puro, testado)
-js/charts.js, js/ui.js       gráficos SVG e utilitários (sem innerHTML)
-supabase/schema.sql          tabelas, RLS, funções (create_house, create_invite, join_house)
+js/app.js                    menu, rotas, login, 2FA
+js/ctx.js                    estado, permissões e componentes de formulário
+js/pages/                    uma tela por arquivo (painel, lançamentos, contas, orçamento...)
+js/finance.js                cálculos (puro, testado): saldos, automáticos, orçamento, metas, calendário
+js/reports.js                os 8 relatórios (puro, testado)
+js/pdf.js                    gerador de PDF próprio, sem biblioteca externa
+js/charts.js, js/icons.js    gráficos e ícones em SVG
+js/ui.js                     utilitários (sem innerHTML), diálogos, moeda
+supabase/schema.sql          instalação nova: tabelas, RLS, funções, bucket
+supabase/migrations/         atualização de bancos existentes
 supabase/functions/ai/       Edge Function da IA (chave criptografada, anti-SSRF, limite de uso)
 tests/                       testes dos cálculos e das regras do banco
 ```

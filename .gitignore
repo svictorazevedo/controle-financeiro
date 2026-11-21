@@ -8,3 +8,6 @@ Thumbs.db
 .idea/
 npm-debug.log*
 supabase/.temp/
+
+# pré-visualização local com dados falsos
+dev/

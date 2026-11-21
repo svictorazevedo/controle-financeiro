@@ -185,9 +185,31 @@ function sanitizeMessages(raw: unknown): Msg[] {
 }
 
 async function membership(userId: string, houseId: string) {
-  const { data } = await admin.from('residents').select('role').eq('house_id', houseId).eq('user_id', userId).maybeSingle();
+  const { data } = await admin.from('residents').select('role, permissions').eq('house_id', houseId).eq('user_id', userId).maybeSingle();
   if (!data) throw new Friendly(404, 'Casa não encontrada.');
   return data.role as 'admin' | 'member';
+}
+
+/** Permissão por tela "Assistente IA" (mesma regra de public.perm no banco; padrão = ver). */
+async function canUseAi(userId: string, houseId: string) {
+  const { data } = await admin.from('residents').select('role, permissions').eq('house_id', houseId).eq('user_id', userId).maybeSingle();
+  if (!data) throw new Friendly(404, 'Casa não encontrada.');
+  const level = data.role === 'admin' ? 2 : Number(data.permissions?.ia ?? 1);
+  if (level < 1) throw new Friendly(403, 'Você não tem acesso ao assistente de IA nesta casa.');
+}
+
+/** 2FA: quem tem app autenticador ativo precisa de sessão verificada (aal2), como no RLS. */
+// deno-lint-ignore no-explicit-any
+function assertMfa(user: any, authHeader: string) {
+  // deno-lint-ignore no-explicit-any
+  const verified = (user.factors ?? []).some((f: any) => f.status === 'verified');
+  if (!verified) return;
+  let aal = 'aal1';
+  try {
+    const payload = authHeader.replace(/^Bearer\s+/i, '').split('.')[1];
+    aal = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).aal ?? 'aal1';
+  } catch { /* token já validado por getUser; sem claim => aal1 */ }
+  if (aal !== 'aal2') throw new Friendly(401, 'Confirme o código da verificação em duas etapas para continuar.');
 }
 
 // ---------------------------------------------------------------- ações
@@ -232,7 +254,7 @@ async function remove(userId: string, b: any) {
 
 // deno-lint-ignore no-explicit-any
 async function chat(userId: string, b: any) {
-  await membership(userId, b.houseId);
+  await canUseAi(userId, b.houseId);
   const limit = Number(env('AI_REQUESTS_PER_HOUR')) || 30;
   const since = new Date(Date.now() - 3600_000).toISOString();
   const { count } = await admin.from('ai_usage').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', since);
@@ -264,6 +286,7 @@ Deno.serve(async (req) => {
     const userClient = createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: 'Faça login para continuar.' }, 401);
+    assertMfa(user, auth);
 
     const raw = await req.text();
     if (raw.length > 100_000) return json({ error: 'Dados grandes demais.' }, 413);

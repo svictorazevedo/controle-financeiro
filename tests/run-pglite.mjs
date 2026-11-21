@@ -1,10 +1,10 @@
 // Testes do banco SEM Docker: Postgres em WebAssembly (PGlite) + um mini-psql (set, echo, gset, :'var').
 // Uso: npm i --no-save @electric-sql/pglite@0.3.14 && npm run test:db
-// Avançado: node tests/run-pglite.mjs . tests/01_rules.sql --from-old <schema-antigo.sql> <migracao.sql>
+// Migração: node tests/run-pglite.mjs . <testes.sql> --from-old <schema-antigo.sql> <migracao.sql> [<dados-antes.sql>]
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 
-const [repo, testFile, flag, oldSchema, migration] = process.argv.slice(2);
+const [repo, testFile, flag, oldSchema, migration, beforeMigration] = process.argv.slice(2);
 const read = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 const db = new PGlite();
 const notices = [];
@@ -70,11 +70,12 @@ try {
   await runScript(read(`${repo}/tests/00_stub_supabase.sql`).replace(/^create role.*$/m, ''), 'stub');
   if (flag === '--from-old') {
     await runScript(read(oldSchema), 'schema antigo');
+    if (beforeMigration) await runScript(read(beforeMigration), 'dados v1');
     await runScript(read(migration), 'migração');
   } else {
     await runScript(read(`${repo}/supabase/schema.sql`), 'schema');
   }
-  if (testFile && testFile !== '-') await runScript(read(testFile), 'testes');
+  if (testFile && testFile !== '-') for (const f of testFile.split(',')) await runScript(read(f), f);
 } catch (e) {
   console.error('ERRO:', e.message);
   console.error('na instrução:', lastStmt.trim().slice(0, 400));

@@ -17,10 +17,11 @@ const data = {
     { id: 3, resident_id: 'eu', category_id: null, description: 'Geladeira', mode: 'fixed', amount_cents: 30000, start_month: '2026-02', installments: 3, active: true },
     { id: 4, resident_id: null, category_id: 'mor', description: 'Pausado', mode: 'fixed', amount_cents: 999, start_month: '2026-01', active: false },
   ],
-  expenses: [
-    { id: 1, resident_id: 'eu', category_id: 'mer', description: 'Mercado', amount_cents: 80000, date: '2026-03-10', created_by: 'u1' },
-    { id: 2, resident_id: null, category_id: 'mer', description: 'Feira', amount_cents: 5000, date: '2026-04-02', created_by: 'u1' },
+  transactions: [
+    { id: 1, type: 'expense', resident_id: 'eu', category_id: 'mer', description: 'Mercado', amount_cents: 80000, date: '2026-03-10', created_by: 'u1' },
+    { id: 2, type: 'expense', resident_id: null, category_id: 'mer', description: 'Feira', amount_cents: 5000, date: '2026-04-02', created_by: 'u1' },
   ],
+  accounts: [], budgets: [],
 };
 
 test('ganhos do mês: mensais, únicos e com fim', () => {
@@ -74,7 +75,7 @@ test('tendência de 6 meses e utilidades', () => {
 
 test('contexto da IA tem os totais e não tem e-mails', () => {
   const ctx = buildContext('Casa', monthSummary(data, '2026-03'));
-  assert.match(ctx, /GANHOS DO MÊS: R\$\s?8\.000,00/);
-  assert.match(ctx, /GASTOS DO MÊS: R\$\s?3\.200,00/);
+  assert.match(ctx, /ENTRADAS DO MÊS: R\$\s?8\.000,00/);
+  assert.match(ctx, /SAÍDAS DO MÊS: R\$\s?3\.200,00/);
   assert.doesNotMatch(ctx, /@/);
 });

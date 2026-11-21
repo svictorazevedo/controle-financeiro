@@ -9,8 +9,8 @@ Não existe servidor próprio, e o código do site é público. Isso exige três
 - **Supor que o atacante chama a API diretamente**, sem passar pelas telas.
 
 Os itens com 🧪 são verificados pelos testes:
-- `npm run test:db`: 29 verificações das regras do banco;
-- `npm test`: cálculos.
+- `npm run test:db`: 70 verificações das regras do banco (77 em `npm run test:migration`, que parte da v1);
+- `npm test`: cálculos, relatórios e PDF.
 
 ## 1. Ameaças e defesas
 
@@ -34,13 +34,19 @@ Os itens com 🧪 são verificados pelos testes:
 | 16 | **SQL injection** | Não há SQL montado com texto: o PostgREST usa parâmetros, e as funções são PL/pgSQL com variáveis. Funções `SECURITY DEFINER` usam `search_path = ''`. | `schema.sql` |
 | 17 | **Chave secreta do Supabase no site** | O app se recusa a funcionar se `js/config.js` tiver uma chave `service_role`/`sb_secret_`. | `js/api.js` |
 | 18 | **Valores absurdos** | `CHECK` no banco: dinheiro > 0 e ≤ R$ 100 mi, percentuais de 0,01% a 100%, meses `AAAA-MM`, textos com tamanho máximo, parcelas de 1 a 600. 🧪 | `schema.sql` |
+| 19 | **Colaborador ver ou mexer em telas que não deveria** 🧪 | Permissão por tela (0 sem acesso, 1 ver, 2 editar) guardada em `residents.permissions`, validada por `CHECK` e conferida pelas políticas RLS com `perm()`/`can_view()`. Só o admin altera permissões. Lançamentos são legíveis por quem vê Painel, Lançamentos, Contas, Calendário ou Relatórios (essas telas são calculadas a partir deles). A Edge Function confere "Assistente IA". | `schema.sql`, `functions/ai` |
+| 20 | **Senha vazada de quem usa 2FA** 🧪 | Política RLS **restritiva** em todas as tabelas: quem tem fator TOTP verificado só lê/grava com sessão `aal2` (depois do código). Vale também para as funções RPC, os comprovantes e a função de IA. | `schema.sql`, `functions/ai` |
+| 21 | **Comprovante de outra casa / arquivo malicioso** 🧪 | Bucket privado `receipts`, caminho sempre `<id da casa>/<uuid>.<ext>` (conferido por `CHECK` no lançamento e pela política do Storage). Só JPG, PNG, WEBP e PDF, até 5 MB (limite no bucket). Visualização por link assinado de 2 minutos. | `schema.sql`, `js/pages/tx.js` |
+| 22 | **Logo/ícone com script** 🧪 | Só `data:image/png|jpeg|webp;base64` (SVG recusado por `CHECK`), com tamanho máximo. | `schema.sql` |
+| 23 | **CSV com fórmula** (planilha executando `=HYPERLINK(...)`) | Células de texto que começam com `= + @` ganham um apóstrofo antes. | `js/pages/reports.js`, `transactions.js` |
 
 ## 2. Recomendações (dependem de você, no painel)
 
 1. **Desligue o cadastro aberto** depois de criar as contas (README 1.6).
 2. **CAPTCHA no login e no cadastro**: em Authentication › Attack Protection, ligue o Cloudflare Turnstile (grátis).
    Se quiser, eu adapto o site para enviar o token, como no `louvorganize`.
-3. **Ative a autenticação em dois fatores (MFA/TOTP)** do Supabase. O site ainda não tem a tela de MFA; dá para adicionar.
+3. **Ative a verificação em duas etapas** em *Minha conta* (cada pessoa, principalmente os administradores).
+   Confira que o TOTP está ligado em Authentication › Multi-Factor (vem ligado por padrão).
 4. **Guarde a `APP_ENCRYPTION_KEY`** num gerenciador de senhas. Se ela vazar, gere outra e cadastre as chaves de IA de novo.
 5. **Backup:** o plano grátis do Supabase **não** tem backup diário. Exporte periodicamente
    (Database › Backups, ou `pg_dump` com a connection string).

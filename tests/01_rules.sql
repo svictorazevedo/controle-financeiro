@@ -8,7 +8,7 @@ create table t.ids (name text primary key, id uuid);
 grant all on t.ids to anon, authenticated;
 
 create function t.as_user(u uuid) returns void language plpgsql as $$
-begin execute 'reset role'; perform set_config('request.jwt.claim.sub', u::text, false); execute 'set role authenticated'; end $$;
+begin execute 'reset role'; perform set_config('request.jwt.claim.sub', u::text, false); perform set_config('request.jwt.claims', '', false); execute 'set role authenticated'; end $$;
 create function t.as_anon() returns void language plpgsql as $$
 begin execute 'reset role'; perform set_config('request.jwt.claim.sub', '', false); execute 'set role anon'; end $$;
 create function t.as_root() returns void language plpgsql as $$
@@ -43,7 +43,7 @@ insert into auth.users (id, email) values
 -- ── criar casas ───────────────────────────────────────────────────────────
 select t.as_user('a0000000-0000-0000-0000-00000000000a');
 select t.put('houseA', public.create_house('Casa A', 'Ana'));
-select t.eq('15 categorias padrão', (select count(*) from public.categories where house_id = t.id('houseA'))::text, '15');
+select t.eq('15 categorias padrão de saída', (select count(*) from public.categories where house_id = t.id('houseA') and type = 'expense')::text, '15');
 select t.put('ana', (select id from public.residents where house_id = t.id('houseA') and name = 'Ana'));
 insert into public.residents (house_id, name) values (t.id('houseA'), 'Beto');
 insert into public.residents (house_id, name) values (t.id('houseA'), 'Filho');
@@ -67,19 +67,19 @@ select t.eq('Beto não vê hashes de convite', (select count(*) from public.invi
 
 -- ── visitante não logado ──────────────────────────────────────────────────
 select t.as_anon();
-select t.expect_fail($$ select count(*) from public.expenses $$, 'permission denied');
+select t.expect_fail($$ select count(*) from public.transactions $$, 'permission denied');
 select t.expect_fail($$ select public.create_house('x', 'y') $$, 'permission denied');
 
 -- ── isolamento entre casas (intrusa Carla) ────────────────────────────────
 select t.as_user('c0000000-0000-0000-0000-00000000000c');
 select t.eq('Carla não vê moradores de A', (select count(*) from public.residents where house_id = t.id('houseA'))::text, '0');
-select t.expect_fail(format($$ insert into public.expenses (house_id, description, amount_cents, date) values (%L, 'x', 100, '2026-01-01') $$, t.id('houseA')), 'row-level security');
+select t.expect_fail(format($$ insert into public.transactions (house_id, description, amount_cents, date) values (%L, 'x', 100, '2026-01-01') $$, t.id('houseA')), 'row-level security');
 select t.expect_fail(format($$ insert into public.residents (house_id, name) values (%L, 'Invasor') $$, t.id('houseA')), 'row-level security');
 select t.expect_fail(format($$ select public.create_invite(%L) $$, t.id('filho')), 'forbidden');
 -- usar categoria da casa A num gasto da casa C: barrado pela chave estrangeira composta
-select t.expect_fail(format($$ insert into public.expenses (house_id, category_id, description, amount_cents, date) values (%L, %L, 'x', 100, '2026-01-01') $$, t.id('houseC'), t.id('catMercado')), 'foreign key');
+select t.expect_fail(format($$ insert into public.transactions (house_id, category_id, description, amount_cents, date) values (%L, %L, 'x', 100, '2026-01-01') $$, t.id('houseC'), t.id('catMercado')), 'foreign key');
 update public.houses set name = 'hackeada' where id = t.id('houseA');
-delete from public.expenses where house_id = t.id('houseA');
+delete from public.transactions where house_id = t.id('houseA');
 
 -- ── permissões dentro da casa ─────────────────────────────────────────────
 select t.as_user('b0000000-0000-0000-0000-00000000000b');
@@ -89,10 +89,10 @@ select t.expect_fail(format($$ insert into public.incomes (house_id, resident_id
 select t.expect_fail(format($$ insert into public.recurring (house_id, description, mode, amount_cents, start_month) values (%L, 'Aluguel', 'fixed', 100, '2026-01') $$, t.id('houseA')), 'row-level security');
 update public.residents set role = 'admin' where id = t.id('beto');   -- RLS: não altera nada
 select t.eq('morador não promove a si mesmo', (select role from public.residents where id = t.id('beto')), 'member');
-insert into public.expenses (house_id, description, amount_cents, date, created_by)
+insert into public.transactions (house_id, description, amount_cents, date, created_by)
   values (t.id('houseA'), 'Pão', 1500, '2026-03-02', 'a0000000-0000-0000-0000-00000000000a');
-select t.eq('autor do gasto não pode ser forjado', (select created_by::text from public.expenses where description = 'Pão'), 'b0000000-0000-0000-0000-00000000000b');
-select t.expect_fail(format($$ update public.expenses set house_id = %L where description = 'Pão' $$, t.id('houseC')), 'house_id_immutable');
+select t.eq('autor do gasto não pode ser forjado', (select created_by::text from public.transactions where description = 'Pão'), 'b0000000-0000-0000-0000-00000000000b');
+select t.expect_fail(format($$ update public.transactions set house_id = %L where description = 'Pão' $$, t.id('houseC')), 'house_id_immutable');
 insert into public.goals (house_id, resident_id, name, percent_bp) values (t.id('houseA'), t.id('beto'), 'Reserva', 6000);
 select t.expect_fail(format($$ insert into public.goals (house_id, resident_id, name, percent_bp) values (%L, %L, 'Demais', 5000) $$, t.id('houseA'), t.id('beto')), 'goals_over_100');
 delete from public.categories where id = t.id('catMercado');   -- RLS: não apaga nada
@@ -100,7 +100,7 @@ delete from public.categories where id = t.id('catMercado');   -- RLS: não apag
 -- ── admin ─────────────────────────────────────────────────────────────────
 select t.as_user('a0000000-0000-0000-0000-00000000000a');
 select t.eq('categoria continua (só admin exclui)', (select count(*) from public.categories where id = t.id('catMercado'))::text, '1');
-insert into public.expenses (house_id, resident_id, description, amount_cents, date) values (t.id('houseA'), t.id('filho'), 'Material escolar', 9000, '2026-03-05');
+insert into public.transactions (house_id, resident_id, description, amount_cents, date) values (t.id('houseA'), t.id('filho'), 'Material escolar', 9000, '2026-03-05');
 insert into public.recurring (house_id, description, mode, amount_cents, start_month, category_id) values (t.id('houseA'), 'Aluguel', 'fixed', 150000, '2026-01', t.id('catMercado'));
 select t.expect_fail(format($$ update public.residents set user_id = 'c0000000-0000-0000-0000-00000000000c' where id = %L $$, t.id('filho')), 'resident_link_via_invite');
 select t.expect_fail(format($$ update public.residents set role = 'member' where id = %L $$, t.id('ana')), 'need_one_admin');
@@ -109,6 +109,6 @@ select t.eq('admin não vê a chave de IA', (select has_table_privilege('authent
 delete from public.categories where id = t.id('catMercado');
 select t.eq('gasto fica sem categoria ao excluir a categoria', (select count(*) from public.recurring where category_id is null)::text, '1');
 select t.eq('casa A no nome original', (select name from public.houses where id = t.id('houseA')), 'Casa A');
-select t.eq('gastos de A intactos', (select count(*) from public.expenses where house_id = t.id('houseA'))::text, '2');
+select t.eq('gastos de A intactos', (select count(*) from public.transactions where house_id = t.id('houseA'))::text, '2');
 delete from public.houses where id = t.id('houseA');
 select t.eq('excluir casa apaga tudo dela', (select count(*) from public.residents where house_id = t.id('houseA'))::text, '0');
