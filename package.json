@@ -1,6 +1,6 @@
 {
   "name": "controle-financeiro",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "private": true,
   "type": "module",
   "description": "Controle financeiro doméstico — site estático (GitHub Pages) + Supabase",

@@ -910,14 +910,19 @@ dialog.dialog:focus { outline: none; }
   /* Janelas viram folhas presas embaixo, com alça para arrastar */
   html.has-dialog body { overflow: hidden; }
   dialog.dialog, dialog.dialog.wide {
-    width: 100%; max-width: 100%; margin: auto 0 0; max-height: calc(100dvh - 24px - var(--safe-t)); border-radius: 22px 22px 0 0;
+    width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 22px 22px 0 0;
+    max-height: calc(100vh - 24px - var(--safe-t)); max-height: calc(100dvh - 24px - var(--safe-t));
     padding-bottom: var(--safe-b); transition: transform .22s ease;
   }
-  dialog.dialog[open] { display: flex; flex-direction: column; animation: sheet-up .28s cubic-bezier(.2, .8, .2, 1); }
+  dialog.dialog[open] { overflow: hidden; animation: sheet-up .28s cubic-bezier(.2, .8, .2, 1); }
   @keyframes sheet-up { from { transform: translateY(100%); } }
   .grabber { display: block; position: absolute; top: 7px; left: 50%; width: 40px; height: 5px; border-radius: 3px; background: var(--border-strong); transform: translateX(-50%); }
   .dialog-head { position: relative; padding: 1.25rem 1rem .35rem; touch-action: none; }
-  .dialog-body { flex: 1; max-height: none; padding: .5rem 1rem 1rem; overscroll-behavior: contain; }
+  /* Altura máxima explícita no corpo (sem flex): no Safari/iPhone o corpo em flex ficava com altura zero e só o título aparecia */
+  .dialog-body {
+    padding: .5rem 1rem 1rem; overscroll-behavior: contain;
+    max-height: calc(100vh - 90px - var(--safe-t) - var(--safe-b)); max-height: calc(100dvh - 90px - var(--safe-t) - var(--safe-b));
+  }
   .dialog-actions { position: sticky; bottom: -1rem; z-index: 2; margin: .4rem -1rem -1rem; padding: .7rem 1rem 1rem; background: var(--surface); border-top: 1px solid var(--border); flex-wrap: nowrap; }
   .dialog-actions .btn { flex: 1; }
   .tx-form .big-money input { font-size: 1.6rem; min-height: 56px; }
