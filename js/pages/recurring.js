@@ -162,7 +162,7 @@ export async function renderRecurring() {
     body = d.incomes.length ? h('div', { class: 'table-wrap' }, h('table', { class: 'data' },
       h('thead', {}, h('tr', {}, ...['Morador', 'Descrição', 'Categoria', 'Conta', 'Período', 'Dia'].map((x) => h('th', {}, x)), h('th', { class: 'num' }, 'Valor'), h('th', { class: 'act' }))),
       h('tbody', {}, ...d.incomes.map((i) => h('tr', {},
-        h('td', {}, residentName(i.resident_id)), h('td', {}, i.description, ' ', h('span', { class: 'tag' }, i.kind === 'recurring' ? 'mensal' : 'uma vez')),
+        h('td', {}, residentName(i.resident_id)), h('td', { class: 'cell-title' }, i.description, ' ', h('span', { class: 'tag' }, i.kind === 'recurring' ? 'mensal' : 'uma vez')),
         h('td', {}, categoryChip(i.category_id)), h('td', {}, accountName(i.account_id)),
         h('td', {}, i.kind === 'once' ? monthLabel(i.start_month) : `desde ${monthLabel(i.start_month)}${i.end_month ? ` até ${monthLabel(i.end_month)}` : ''}`),
         h('td', { class: 'num' }, i.day ?? 1),

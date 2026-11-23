@@ -32,6 +32,7 @@ Navegador ──► GitHub Pages (HTML + JS, estático)
 | **Usuários** | Administradores e colaboradores (com ou sem login). **Permissão por tela**: sem acesso, ver ou editar. |
 | **Segurança** | Verificação em duas etapas (app autenticador). Quem ativa só acessa os dados com o código. |
 | **Configuração** | Nome, **moeda**, **logo** e **ícone** próprios; tema claro/escuro. |
+| **Celular** | Barra de navegação embaixo (Painel, Lançamentos, **+**, Calendário, Mais) e microfone no topo. Os formulários sobem de baixo, como folhas (arraste para baixo para fechar). Lançamentos aparecem agrupados por dia, e tocar num item abre editar, duplicar e excluir. Filtros ficam recolhidos e as tabelas viram cartões. A descrição sugere lançamentos anteriores e já preenche categoria e conta. Dá para instalar o site na tela inicial. |
 | **Assistente de IA** | Chat sobre o mês: **Claude (Anthropic)**, APIs compatíveis com OpenAI e **Google Gemini**. |
 
 ### Quem pode fazer o quê
@@ -139,6 +140,7 @@ npm run test:migration                     # migração v1 -> v2 com dados antig
 
 ```
 index.html, css/, icon.svg   página e estilos (tema claro/escuro, responsivo, impressão)
+manifest.webmanifest         instalação na tela inicial do celular
 js/config.js                 URL e chave publicável do Supabase
 js/api.js                    cliente Supabase e mensagens de erro
 js/app.js                    menu, rotas, login, 2FA

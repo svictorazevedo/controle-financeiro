@@ -4,7 +4,7 @@
 import { sb, q, configured, secretKeyError, friendly } from './api.js';
 import { state, loadMe, loadHouse, perm, isAdmin, canEdit, setRerender, field, input, run, applyBranding } from './ctx.js';
 import { addMonths, localToday } from './finance.js';
-import { h, $, clear, toast, monthLabel, initials, menuButton } from './ui.js';
+import { h, $, clear, toast, monthLabel, initials, menuButton, openDialog, MOBILE_MQ } from './ui.js';
 import { icon } from './icons.js';
 import { renderDashboard } from './pages/dashboard.js';
 import { renderTransactions } from './pages/transactions.js';
@@ -101,11 +101,100 @@ function buildShell() {
     },
   });
   shell.user = h('div', { class: 'user-menu' });
+  // Celular: microfone no topo e barra de navegação embaixo (o "+" central abre o lançamento).
+  shell.mic = h('button', { type: 'button', class: 'icon-btn phone-only mic-top', 'aria-label': 'Lançar por voz com IA', onclick: () => openVoiceDialog() }, icon('mic', 20));
   shell.topbar = h('header', { class: 'topbar' },
-    h('button', { type: 'button', class: 'icon-btn mobile-only', 'aria-label': 'Abrir menu', onclick: () => document.body.classList.toggle('nav-open') }, icon('menu', 20)),
+    h('button', { type: 'button', class: 'icon-btn mobile-only tablet-only', 'aria-label': 'Abrir menu', onclick: () => document.body.classList.toggle('nav-open') }, icon('menu', 20)),
     shell.monthBox, shell.today,
-    h('div', { class: 'top-right' }, shell.house, shell.add, shell.theme, shell.user));
-  layout.append(shell.sidebar, shell.scrim, h('div', { class: 'main-col' }, shell.topbar, $('#app')));
+    h('div', { class: 'top-right' }, shell.house, shell.add, shell.mic, shell.theme, shell.user));
+  shell.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Navegação principal' });
+  layout.append(shell.sidebar, shell.scrim, h('div', { class: 'main-col' }, shell.topbar, $('#app')), shell.tabbar);
+}
+
+// ---------------------------------------------------------------- celular: barra inferior + "Mais"
+function renderTabbar(route) {
+  const can = (key) => {
+    const r = ROUTES.find((x) => x[0] === key);
+    return r && state.houseId && allowed(r[3]);
+  };
+  const tab = (key, label, ic) => h('a', { href: `#/${key}`, class: 'tab', 'aria-current': key === route ? 'page' : null }, icon(ic, 22), h('span', {}, label));
+  const fourth = ['calendario', 'contas', 'orcamento', 'relatorios'].find(can);
+  const fourthDef = fourth ? ROUTES.find((x) => x[0] === fourth) : null;
+  const inTabs = ['painel', 'lancamentos', fourth];
+  const items = [
+    can('painel') ? tab('painel', 'Painel', 'dashboard') : null,
+    can('lancamentos') ? tab('lancamentos', 'Lançamentos', 'receipt') : null,
+    state.houseId && canEdit('lancamentos')
+      ? h('button', { type: 'button', class: 'tab-add', 'aria-label': 'Novo lançamento', onclick: () => openTxDialog() }, icon('plus', 26)) : null,
+    fourthDef ? tab(fourth, fourthDef[1] === 'Fixos e recorrentes' ? 'Fixos' : fourthDef[1], fourthDef[2]) : null,
+    h('button', {
+      type: 'button', class: 'tab', 'aria-current': !inTabs.includes(route) ? 'page' : null, onclick: () => openMoreSheet(route),
+    }, icon('menu', 22), h('span', {}, 'Mais')),
+  ];
+  shell.tabbar.replaceChildren(...items.filter(Boolean));
+}
+
+function openMoreSheet(route) {
+  let go = null;
+  const name = state.user.user_metadata?.name || state.user.email.split('@')[0];
+  const link = (key, label, ic) => h('a', {
+    href: `#/${key}`, class: 'more-item', 'aria-current': key === route ? 'page' : null,
+    onclick: (e) => {
+      e.preventDefault();
+      go = () => { location.hash = `#/${key}`; };
+      d.close();
+    },
+  }, h('span', { class: 'more-ico' }, icon(ic, 20)), h('span', {}, label));
+  const groups = [];
+  let cur = null;
+  for (const [key, label, ic, mod, grp] of ROUTES) {
+    if (key === 'conta' || (state.houseId ? !allowed(mod) : true)) continue;
+    if (!cur || cur.name !== grp) groups.push(cur = { name: grp, items: [] });
+    cur.items.push(link(key, label, ic));
+  }
+  const houseSel = state.houses.length > 1 ? h('div', { class: 'more-houses' }, ...state.houses.map((x) => h('button', {
+    type: 'button', class: `chip${x.id === state.houseId ? ' on' : ''}`, 'aria-pressed': String(x.id === state.houseId),
+    onclick: () => {
+      if (x.id === state.houseId) return;
+      go = () => {
+        state.houseId = x.id;
+        state.d = null;
+        state.chat = [];
+        render();
+      };
+      d.close();
+    },
+  }, icon('home', 15), x.name))) : null;
+  const d = openDialog({
+    title: 'Menu',
+    cls: 'sheet-more',
+    body: h('div', { class: 'more' },
+      h('a', {
+        href: '#/conta', class: 'more-user',
+        onclick: (e) => {
+          e.preventDefault();
+          go = () => { location.hash = '#/conta'; };
+          d.close();
+        },
+      }, h('span', { class: 'avatar' }, initials(name)), h('span', { class: 'mu-text' }, h('strong', {}, name), h('small', {}, state.user.email)), icon('right', 18)),
+      houseSel ? h('div', {}, h('span', { class: 'nav-title' }, 'Casa/empresa'), houseSel) : null,
+      ...groups.map((g) => h('div', {}, h('span', { class: 'nav-title' }, g.name), h('div', { class: 'more-grid' }, ...g.items))),
+      h('div', { class: 'more-foot' },
+        h('button', {
+          type: 'button', class: 'btn ghost',
+          onclick: () => {
+            const next = isDark() ? 'light' : 'dark';
+            applyTheme(next);
+            try {
+              localStorage.setItem('theme', next);
+            } catch { /* ignore */ }
+            paintTheme();
+            d.close();
+          },
+        }, icon(isDark() ? 'sun' : 'moon', 18), h('span', {}, isDark() ? 'Tema claro' : 'Tema escuro')),
+        h('button', { type: 'button', class: 'btn ghost danger-text', onclick: () => sb.auth.signOut() }, icon('logout', 18), h('span', {}, 'Sair')))),
+    onClose: () => go?.(),
+  });
 }
 function paintTheme() {
   shell.theme.replaceChildren(icon(isDark() ? 'sun' : 'moon', 18));
@@ -146,6 +235,8 @@ function renderShell(route) {
   shell.monthBox.hidden = !state.houseId;
   shell.today.hidden = !state.houseId || state.month === localToday().slice(0, 7);
   shell.add.hidden = !state.houseId || !canEdit('lancamentos');
+  shell.mic.hidden = shell.add.hidden;
+  renderTabbar(route);
   shell.user.replaceChildren(menuButton([
     { label: 'Minha conta', icon: 'user', onclick: () => { location.hash = '#/conta'; } },
     isAdmin() ? { label: 'Configurações', icon: 'settings', onclick: () => { location.hash = '#/configuracoes'; } } : null,
@@ -339,6 +430,22 @@ async function start(hash) {
 
 buildShell();
 window.addEventListener('hashchange', render);
+// Ao girar o celular / mudar a largura entre celular e computador, redesenha (listas x tabelas).
+MOBILE_MQ.addEventListener('change', () => {
+  if (state.user && state.d && !document.querySelector('dialog[open]')) render();
+});
+// Tabelas viram cartões no celular: cada célula ganha o nome da coluna (data-label) a partir do cabeçalho.
+function labelTables(root) {
+  for (const table of root.querySelectorAll('table.data')) {
+    const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+    for (const tr of table.querySelectorAll('tbody tr, tfoot tr')) {
+      [...tr.children].forEach((td, i) => {
+        if (heads[i] && !td.hasAttribute('data-label')) td.setAttribute('data-label', heads[i]);
+      });
+    }
+  }
+}
+new MutationObserver(() => labelTables($('#app'))).observe($('#app'), { childList: true, subtree: true });
 document.addEventListener('keydown', (e) => {
   // Atalhos: "n" novo lançamento, "v" lançamento por voz (fora de campos de texto)
   if ((e.key === 'n' || e.key === 'v') && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea|select/i.test(document.activeElement?.tagName ?? '')

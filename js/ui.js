@@ -102,6 +102,21 @@ export function dateLong(d) {
   const x = new Date(`${d}T12:00:00Z`);
   return x.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 }
+/** "Hoje", "Ontem", "Amanhã" ou "Seg., 18 de nov." — usa a data local do aparelho. */
+export function dayLabel(d) {
+  const t = new Date();
+  const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const today = iso(t);
+  const shift = (n) => iso(new Date(t.getFullYear(), t.getMonth(), t.getDate() + n));
+  if (d === today) return 'Hoje';
+  if (d === shift(-1)) return 'Ontem';
+  if (d === shift(1)) return 'Amanhã';
+  const x = new Date(`${d}T12:00:00Z`);
+  const s = x.toLocaleDateString('pt-BR', {
+    weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC', ...(d.slice(0, 4) !== today.slice(0, 4) ? { year: 'numeric' } : {}),
+  });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 export function dateShort(d) {
   const x = new Date(`${d}T12:00:00Z`);
   return x.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: 'UTC' }).replace('.', '');
@@ -120,33 +135,87 @@ export function toast(msg, isError = false) {
   }, isError ? 5000 : 2600);
 }
 
+// ---------------------------------------------------------------- celular
+/** Tela de celular (mesmo limite do CSS). No celular as janelas viram "folhas" que sobem de baixo. */
+export const MOBILE_MQ = matchMedia('(max-width: 760px)');
+export const isMobile = () => MOBILE_MQ.matches;
+
+/** Arrastar a folha para baixo (pela alça/cabeçalho) fecha a janela. */
+function swipeToClose(dlg, handle, close) {
+  let y0 = null;
+  let dy = 0;
+  handle.addEventListener('touchstart', (e) => {
+    if (!isMobile() || e.touches.length !== 1) return;
+    y0 = e.touches[0].clientY;
+    dy = 0;
+    dlg.style.transition = 'none';
+  }, { passive: true });
+  handle.addEventListener('touchmove', (e) => {
+    if (y0 === null) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    dlg.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+  const end = () => {
+    if (y0 === null) return;
+    y0 = null;
+    dlg.style.transition = '';
+    if (dy > 90) close();
+    else dlg.style.transform = '';
+  };
+  handle.addEventListener('touchend', end);
+  handle.addEventListener('touchcancel', end);
+}
+
 // ---------------------------------------------------------------- diálogos (substituem prompt/confirm)
 /**
  * Abre um diálogo modal. `body` pode ser um <form>; nesse caso o envio é tratado por quem chamou.
+ * No celular ele aparece como folha presa na parte de baixo da tela.
  * Devolve { el, close }.
  */
-export function openDialog({ title, body, wide = false, onClose }) {
-  const dlg = h('dialog', { class: `dialog${wide ? ' wide' : ''}`, 'aria-label': title });
+export function openDialog({ title, body, wide = false, onClose, cls = '' }) {
+  const dlg = h('dialog', { class: `dialog${wide ? ' wide' : ''} ${cls}`, 'aria-label': title });
   const close = () => {
     if (dlg.open) dlg.close();
   };
-  dlg.append(
-    h('header', { class: 'dialog-head' }, h('h2', {}, title),
-      h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Fechar', onclick: close }, icon('x', 18))),
-    h('div', { class: 'dialog-body' }, body),
-  );
+  const head = h('header', { class: 'dialog-head' }, h('span', { class: 'grabber', 'aria-hidden': 'true' }), h('h2', {}, title),
+    h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Fechar', onclick: close }, icon('x', 18)));
+  dlg.append(head, h('div', { class: 'dialog-body' }, body));
   dlg.addEventListener('close', () => {
     dlg.remove();
+    document.documentElement.classList.toggle('has-dialog', !!document.querySelector('dialog[open]'));
     onClose?.();
   });
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) close();      // clique fora
   });
+  swipeToClose(dlg, head, close);
   document.body.append(dlg);
   dlg.showModal();
-  const first = dlg.querySelector('.dialog-body input:not([type=hidden]):not([type=checkbox]):not([type=radio]), .dialog-body select, .dialog-body textarea');
-  first?.focus();
+  document.documentElement.classList.add('has-dialog');
+  // No celular, focar um campo de texto abre o teclado por cima da folha: só foca quando quem chamou pedir.
+  if (!isMobile()) {
+    const first = dlg.querySelector('.dialog-body input:not([type=hidden]):not([type=checkbox]):not([type=radio]), .dialog-body select, .dialog-body textarea');
+    first?.focus();
+  } else {
+    // Foco na própria folha (não no "X"), para leitores de tela anunciarem o título.
+    dlg.tabIndex = -1;
+    dlg.focus();
+  }
   return { el: dlg, close };
+}
+
+/** Lista de ações em folha (celular): substitui o menu "⋮". items: [{label, icon, onclick, danger}] */
+export function actionSheet(title, items) {
+  let chosen = null;
+  const list = h('div', { class: 'action-list' }, ...items.filter(Boolean).map((it) => h('button', {
+    type: 'button', class: it.danger ? 'danger' : '',
+    onclick: () => {
+      chosen = it;
+      d.close();
+    },
+  }, it.icon ? icon(it.icon, 20) : null, h('span', {}, it.label), it.hint ? h('small', {}, it.hint) : null)));
+  const d = openDialog({ title, body: list, cls: 'sheet-actions', onClose: () => chosen?.onclick?.() });
+  return d;
 }
 
 export function confirmDialog(message, { title = 'Confirmar', confirmText = 'Confirmar', danger = false, detail = null } = {}) {
@@ -205,6 +274,10 @@ export function menuButton(items, label = 'Ações') {
     }, it.icon ? icon(it.icon, 16) : null, it.label));
   }
   btn.addEventListener('click', () => {
+    if (isMobile()) {             // no celular: lista de ações grande, presa embaixo
+      actionSheet(label === 'Ações' ? 'O que deseja fazer?' : label, items);
+      return;
+    }
     const open = list.hidden;
     if (open) {
       list.hidden = false;

@@ -1,13 +1,13 @@
 // Lançamentos: lista com filtros por tipo, período, conta, categoria e busca.
-import { state, page, card, canEdit, categoryChip, accountName, residentName, emptyState, routeParams, select, field, input, accountOptions, categorySelect } from '../ctx.js';
+import { state, page, card, canEdit, categoryChip, categoryLabel, categoryColor, accountName, residentName, emptyState, routeParams, select, field, input, accountOptions, categorySelect } from '../ctx.js';
 import { movements, sumBy, localToday, addMonths, dateFor, addDays, topCategory } from '../finance.js';
-import { h, brl, dateBr, menuButton, segmented, monthLabel, download } from '../ui.js';
+import { h, brl, dateBr, menuButton, segmented, monthLabel, download, isMobile, actionSheet, dayLabel } from '../ui.js';
 import { icon } from '../icons.js';
 import { openTxDialog, deleteTx, viewAttachment, canChangeTx } from './tx.js';
 import { openVoiceDialog } from './voice.js';
 
 // Filtros ficam guardados enquanto o app está aberto.
-const filters = { type: 'all', preset: 'month', from: null, to: null, account: '', category: '', q: '', auto: true };
+const filters = { type: 'all', preset: 'month', from: null, to: null, account: '', category: '', q: '', auto: true, open: false };
 
 function presetRange(p) {
   const today = localToday();
@@ -103,14 +103,26 @@ export async function renderTransactions() {
     rerun();
   });
 
-  const toolbar = h('div', { class: 'toolbar card' },
-    typeSeg,
+  const mobile = isMobile();
+  const active = (filters.preset !== 'month') + !!filters.account + !!filters.category + !filters.auto;
+  const extra = h('div', { class: 'toolbar-extra', hidden: mobile && !filters.open },
     h('div', { class: 'toolbar-fields' },
       h('label', { class: 'sr-only', for: preset.id = 'f-preset' }, 'Período'), preset, custom,
       h('label', { class: 'sr-only', for: acc.id = 'f-acc' }, 'Conta'), acc,
       h('label', { class: 'sr-only', for: cat.id = 'f-cat' }, 'Categoria'), cat,
-      h('div', { class: 'search' }, icon('search', 16), search)),
+      mobile ? null : h('div', { class: 'search' }, icon('search', 16), search)),
     h('label', { class: 'check' }, autoChk, ' Incluir automáticos (rendas fixas, descontos e parcelas)'));
+  const filterBtn = h('button', {
+    type: 'button', class: `btn ghost filter-btn${active ? ' on' : ''}`, 'aria-expanded': String(!!filters.open),
+    onclick: () => {
+      filters.open = !filters.open;
+      extra.hidden = !filters.open;
+      filterBtn.setAttribute('aria-expanded', String(filters.open));
+    },
+  }, icon('filter', 18), h('span', {}, 'Filtros'), active ? h('span', { class: 'badge' }, String(active)) : null);
+  const toolbar = mobile
+    ? h('div', { class: 'toolbar card' }, typeSeg, h('div', { class: 'toolbar-row' }, h('div', { class: 'search' }, icon('search', 16), search), filterBtn), extra)
+    : h('div', { class: 'toolbar card' }, typeSeg, extra);
 
   const summary = h('div', { class: 'summary-strip' },
     h('div', {}, h('span', {}, 'Entradas'), h('strong', { class: 'num pos' }, brl(tot.income))),
@@ -158,16 +170,56 @@ export async function renderTransactions() {
     download(`lancamentos_${from}_${to}.csv`, `﻿${rows.map((r) => r.map(esc).join(';')).join('\r\n')}`, 'text/csv;charset=utf-8');
   };
 
+  // Celular: lista agrupada por dia; tocar no item abre a edição (ou as opções).
+  const rowActions = (m, tx) => {
+    if (tx && canChangeTx(tx)) {
+      return actionSheet(m.description, [
+        { label: 'Editar', icon: 'pencil', onclick: () => openTxDialog(tx) },
+        tx.attachment_path ? { label: 'Ver comprovante', icon: 'clip', onclick: () => viewAttachment(tx.attachment_path) } : null,
+        { label: 'Duplicar para hoje', icon: 'layers', onclick: () => openTxDialog(tx, { copy: true, date: localToday() }) },
+        { label: 'Excluir', icon: 'trash', danger: true, onclick: () => deleteTx(tx) },
+      ]);
+    }
+    if (m.attachment) return viewAttachment(m.attachment);
+    if (m.source === 'auto' && canEdit('recorrentes')) location.hash = '#/recorrentes';
+    return null;
+  };
+  const mobileList = () => {
+    const groups = new Map();
+    for (const m of list) {
+      if (!groups.has(m.date)) groups.set(m.date, []);
+      groups.get(m.date).push(m);
+    }
+    return h('div', { class: 'day-groups' }, ...[...groups].map(([date, items]) => {
+      const t = sumBy(items);
+      return h('section', { class: 'day-group' },
+        h('header', { class: 'day-head' }, h('span', {}, dayLabel(date)),
+          h('span', { class: `num ${t.balance < 0 ? 'neg' : 'pos'}` }, `${t.balance < 0 ? '−' : '+'} ${brl(Math.abs(t.balance))}`)),
+        h('ul', { class: 'mv-list card' }, ...items.map((m) => {
+          const tx = m.source === 'tx' ? txById.get(m.id) : null;
+          const isIn = m.type === 'income';
+          return h('li', {}, h('button', { type: 'button', class: 'mv tap', onclick: () => rowActions(m, tx) },
+            h('span', { class: 'mv-ico', style: { '--c': categoryColor(m.categoryId) } }, icon(isIn ? 'arrow_in' : 'arrow_out', 16)),
+            h('span', { class: 'mv-main' },
+              h('span', { class: 'mv-desc' }, h('span', { class: 'ell' }, m.description),
+                m.source === 'auto' ? h('span', { class: 'tag', title: 'Lançado automaticamente (Fixos e recorrentes)' }, m.detail || 'automático') : null,
+                m.attachment ? h('span', { class: 'clip', title: 'Tem comprovante' }, icon('clip', 14)) : null),
+              h('span', { class: 'mv-meta' }, categoryLabel(m.categoryId), ' · ', accountName(m.accountId))),
+            h('span', { class: `mv-val num ${isIn ? 'pos' : ''}` }, `${isIn ? '+' : '−'} ${brl(m.amount)}`)));
+        })));
+    }));
+  };
+
   page('Lançamentos', {
     subtitle: `${dateBr(from)} a ${dateBr(to)}`,
     actions: [
-      h('button', { type: 'button', class: 'btn ghost', onclick: exportCsv }, icon('download', 18), h('span', {}, 'CSV')),
-      canEdit('lancamentos') ? h('button', { type: 'button', class: 'btn ghost', onclick: () => openVoiceDialog() }, icon('mic', 18), h('span', {}, 'Por voz')) : null,
-      canEdit('lancamentos') ? h('button', { type: 'button', class: 'btn income', onclick: () => openTxDialog(null, { type: 'income' }) }, icon('arrow_in', 18), h('span', {}, 'Entrada')) : null,
-      canEdit('lancamentos') ? h('button', { type: 'button', class: 'btn expense', onclick: () => openTxDialog(null, { type: 'expense' }) }, icon('arrow_out', 18), h('span', {}, 'Saída')) : null,
+      h('button', { type: 'button', class: 'btn ghost compact', onclick: exportCsv, title: 'Exportar CSV' }, icon('download', 18), h('span', {}, 'CSV')),
+      canEdit('lancamentos') && !mobile ? h('button', { type: 'button', class: 'btn ghost', onclick: () => openVoiceDialog() }, icon('mic', 18), h('span', {}, 'Por voz')) : null,
+      canEdit('lancamentos') && !mobile ? h('button', { type: 'button', class: 'btn income', onclick: () => openTxDialog(null, { type: 'income' }) }, icon('arrow_in', 18), h('span', {}, 'Entrada')) : null,
+      canEdit('lancamentos') && !mobile ? h('button', { type: 'button', class: 'btn expense', onclick: () => openTxDialog(null, { type: 'expense' }) }, icon('arrow_out', 18), h('span', {}, 'Saída')) : null,
     ],
   },
   toolbar, summary,
-  card(null, { cls: 'flush' }, list.length ? h('div', { class: 'table-wrap' }, table)
-    : emptyState('receipt', 'Nenhum lançamento encontrado', 'Mude os filtros ou lance uma entrada/saída.')));
+  list.length ? (mobile ? mobileList() : card(null, { cls: 'flush' }, h('div', { class: 'table-wrap' }, table)))
+    : card(null, { cls: 'flush' }, emptyState('receipt', 'Nenhum lançamento encontrado', 'Mude os filtros ou lance uma entrada/saída.')));
 }

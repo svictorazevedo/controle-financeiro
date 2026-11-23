@@ -4,7 +4,7 @@ import { sb, q } from '../api.js';
 import { state, field, input, select, moneyInput, categorySelect, accountOptions, residentsOptions, myResidentId, houseRow, run, reload, isAdmin, canEdit } from '../ctx.js';
 import { h, openDialog, segmented, parseMoney, centsToInput, toast, confirmDialog, dateBr, brl } from '../ui.js';
 import { icon } from '../icons.js';
-import { localToday } from '../finance.js';
+import { localToday, addDays } from '../finance.js';
 
 const MAX_FILE = 5 * 1024 * 1024;
 const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
@@ -67,19 +67,62 @@ export function openTxDialog(src = null, defaults = {}) {
     fileLabel.querySelector('.dz-text').textContent = file ? `${file.name} (${Math.ceil(file.size / 1024)} KB)` : 'Anexar comprovante';
   });
 
+  // Sugestões de descrição a partir do histórico: escolher uma já preenche categoria e conta.
+  const history = new Map();
+  for (const t of state.d.transactions) {
+    const k = t.description.trim().toLowerCase();
+    if (!history.has(`${t.type}|${k}`)) history.set(`${t.type}|${k}`, t);
+  }
+  const listId = `dl-${Math.random().toString(36).slice(2, 8)}`;
+  const datalist = h('datalist', { id: listId });
+  const paintSuggestions = () => datalist.replaceChildren(...[...history.values()].filter((t) => t.type === type).slice(0, 80)
+    .map((t) => h('option', { value: t.description })));
+  paintSuggestions();
+  f.description.setAttribute('list', listId);
+  f.description.setAttribute('autocomplete', 'off');
+  f.description.setAttribute('enterkeyhint', 'next');
+  f.description.addEventListener('change', () => {
+    if (tx) return;
+    const hit = history.get(`${type}|${f.description.value.trim().toLowerCase()}`);
+    if (!hit) return;
+    if (!cat.value && hit.category_id && state.d.categories.some((c) => c.id === hit.category_id)) paintCat(hit.category_id);
+    if (hit.account_id && state.d.accounts.some((a) => a.id === hit.account_id && !a.archived)) f.account.value = hit.account_id;
+  });
+  kind.addEventListener('change', paintSuggestions);
+
+  // Atalhos de data
+  const yesterday = addDays(today, -1);
+  const dateChips = h('div', { class: 'chips quick-dates' }, ...[['Hoje', today], ['Ontem', yesterday]].map(([label, val]) => h('button', {
+    type: 'button', class: 'chip', 'data-date': val,
+    onclick: () => {
+      f.date.value = val;
+      markDate();
+    },
+  }, label)));
+  const markDate = () => dateChips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.date === f.date.value));
+  f.date.addEventListener('change', markDate);
+  markDate();
+  const dateField = field('Data', f.date);
+  dateField.append(dateChips);
+
   const save = h('button', { class: 'btn', type: 'submit' }, icon('check', 18), h('span', {}, tx ? 'Salvar alteração' : 'Salvar'));
   const again = tx ? null : h('button', { class: 'btn ghost', type: 'submit', value: 'again' }, 'Salvar e lançar outro');
-  const form = h('form', { class: 'form-grid', novalidate: false },
+  const extraActions = tx ? h('div', { class: 'dialog-extra' },
+    h('button', { type: 'button', class: 'btn ghost small', onclick: () => { d.close(); openTxDialog(tx, { copy: true, date: today }); } }, icon('layers', 16), h('span', {}, 'Duplicar')),
+    canChangeTx(tx) ? h('button', { type: 'button', class: 'btn ghost small danger-text', onclick: () => { d.close(); deleteTx(tx); } }, icon('trash', 16), h('span', {}, 'Excluir')) : null) : null;
+  const form = h('form', { class: 'form-grid tx-form', novalidate: false },
     h('div', { class: 'span-2' }, kind),
-    field('Valor', f.amount, { cls: 'big-money' }), field('Data', f.date),
-    field('Descrição', f.description, { cls: 'span-2' }),
+    field('Valor', f.amount, { cls: 'big-money' }), dateField,
+    field('Descrição', f.description, { cls: 'span-2' }), datalist,
     catWrap, field('Conta', f.account),
     field('De quem', f.resident, { cls: 'span-2' }),
     h('div', { class: 'span-2 attach' }, attachInfo, fileLabel, f.file),
+    extraActions ? h('div', { class: 'span-2' }, extraActions) : null,
     h('div', { class: 'dialog-actions span-2' }, again, save));
 
-  const d = openDialog({ title: tx ? 'Editar lançamento' : 'Novo lançamento', body: form });
-  f.amount.querySelector('input').focus();
+  const d = openDialog({ title: tx ? 'Editar lançamento' : 'Novo lançamento', body: form, cls: 'tx-dialog' });
+  if (!tx) f.amount.querySelector('input').focus();
+  f.amount.querySelector('input').setAttribute('enterkeyhint', 'next');
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -116,6 +159,8 @@ export function openTxDialog(src = null, defaults = {}) {
       f.description.value = '';
       f.file.value = '';
       fileLabel.querySelector('.dz-text').textContent = 'Anexar comprovante (foto ou PDF, até 5 MB)';
+      history.set(`${type}|${row.description.toLowerCase()}`, row);
+      paintSuggestions();
       f.amount.querySelector('input').focus();
       reload();
     } else {

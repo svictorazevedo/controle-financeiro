@@ -1,0 +1,13 @@
+{
+  "name": "Controle Financeiro",
+  "short_name": "Finanças",
+  "lang": "pt-BR",
+  "start_url": "./#/painel",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f5f9",
+  "theme_color": "#2a78d6",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

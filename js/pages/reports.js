@@ -163,4 +163,11 @@ export async function renderReports() {
         chart,
         rep.rows.length ? h('div', { class: 'table-wrap' }, table) : h('p', { class: 'muted center' }, 'Nenhum registro para os filtros escolhidos.'),
         h('p', { class: 'hint print-only' }, generated)))));
+  // No celular a lista é uma faixa horizontal: deixa o relatório escolhido visível.
+  const act = list.querySelector('a.active');
+  if (act && list.scrollWidth > list.clientWidth) {
+    const r = act.getBoundingClientRect();
+    const l = list.getBoundingClientRect();
+    list.scrollLeft += r.left - l.left - (l.width - r.width) / 2;
+  }
 }

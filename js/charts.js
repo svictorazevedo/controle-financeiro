@@ -1,5 +1,11 @@
 // Gráficos em SVG/HTML puros (sem bibliotecas externas => nada de CDN, CSP restrita).
-import { h, s, $, brl, brlCompact, monthLabel } from './ui.js';
+import { h, s, $, brl, brlCompact, monthLabel, isMobile } from './ui.js';
+
+// No toque não existe "mouseleave": tocar fora do gráfico ou rolar a tela esconde a dica.
+document.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'mouse' && !e.target.closest?.('.chart, .donut')) hideTip();
+}, { passive: true });
+addEventListener('scroll', () => hideTip(), { passive: true });
 
 function showTip(ev, title, lines) {
   const tip = $('#tooltip');
@@ -39,9 +45,11 @@ function barPath(x, y, w, hgt, r = 4) {
 
 /** Entradas x saídas por mês: barras agrupadas, com legenda, dica e tabela para leitores de tela. */
 export function trendChart(trend, { height = 240, current = null } = {}) {
-  const W = 640;
-  const H = height;
-  const m = { top: 12, right: 8, bottom: 28, left: 64 };
+  // No celular o desenho é feito numa largura menor: o texto do eixo fica legível em vez de encolher.
+  const small = isMobile();
+  const W = small ? 360 : 640;
+  const H = small ? 220 : height;
+  const m = { top: 12, right: 6, bottom: 28, left: small ? 52 : 64 };
   const iw = W - m.left - m.right;
   const ih = H - m.top - m.bottom;
   const max = niceMax(Math.max(...trend.flatMap((t) => [t.income, t.expenses])));
@@ -63,11 +71,13 @@ export function trendChart(trend, { height = 240, current = null } = {}) {
     const xi = cx - barW - gap / 2;
     const xe = cx + gap / 2;
     const hit = s('rect', { class: `hit${t.month === current ? ' current' : ''}`, x: m.left + band * i + 2, y: m.top, width: band - 4, height: ih, rx: 6 });
-    hit.addEventListener('mousemove', (ev) => showTip(ev, monthLabel(t.month), [
+    const tip = (ev) => showTip(ev, monthLabel(t.month), [
       ['var(--series-income)', 'Entradas', brl(t.income)],
       ['var(--series-expense)', 'Saídas', brl(t.expenses)],
       `Resultado: ${brl(t.income - t.expenses)}`,
-    ]));
+    ]);
+    hit.addEventListener('mousemove', tip);
+    hit.addEventListener('click', tip);          // toque no celular
     hit.addEventListener('mouseleave', hideTip);
     svg.append(hit,
       s('path', { class: 'bar-income', d: barPath(xi, y(t.income), barW, m.top + ih - y(t.income)) }),
@@ -111,6 +121,7 @@ export function donut(items, { total: totalLabel = 'Total', max = 6 } = {}) {
       : `M${p(s0, R)}A${R},${R} 0 ${large} 1 ${p(s1, R)}L${p(s1, r)}A${r},${r} 0 ${large} 0 ${p(s0, r)}Z`;
     const seg = s('path', { d, fill: x.color, class: 'slice' });
     seg.addEventListener('mousemove', (ev) => showTip(ev, x.category, [`${brl(x.amount)} · ${Math.round(frac * 100)}%`]));
+    seg.addEventListener('click', (ev) => showTip(ev, x.category, [`${brl(x.amount)} · ${Math.round(frac * 100)}%`]));
     seg.addEventListener('mouseleave', hideTip);
     svg.append(seg);
     a0 = a1;

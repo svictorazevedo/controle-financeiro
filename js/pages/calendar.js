@@ -1,7 +1,7 @@
 // Calendário: visão mensal com total de entradas e saídas por dia + resumo do mês.
 import { state, page, card, canEdit, categoryChip, accountName, routeParams, emptyState } from '../ctx.js';
 import { calendarMonth, localToday, sumBy, movements, dateFor } from '../finance.js';
-import { h, brl, brlCompact, monthLabel, dateLong, $ } from '../ui.js';
+import { h, brl, brlCompact, monthLabel, dateLong, $, isMobile } from '../ui.js';
 import { icon } from '../icons.js';
 import { openTxDialog } from './tx.js';
 
@@ -61,12 +61,15 @@ export async function renderCalendar() {
         cell.classList.add('sel');
         cell.setAttribute('aria-pressed', 'true');
         paintSide();
+        if (isMobile()) side.scrollIntoView({ behavior: 'smooth', block: 'start' });
       },
     }, h('span', { class: 'cal-n' }, dd),
     info ? h('span', { class: 'cal-vals' },
       info.income ? h('span', { class: 'cal-in num' }, `+${brlCompact(info.income)}`) : null,
       info.expense ? h('span', { class: 'cal-out num' }, `−${brlCompact(info.expense)}`) : null,
-      h('span', { class: 'cal-count' }, `${info.items.length} mov.`)) : null);
+      h('span', { class: 'cal-count' }, `${info.items.length} mov.`)) : null,
+    info ? h('span', { class: 'dots cal-dots', 'aria-hidden': 'true' },
+      info.income ? h('i', { class: 'dot in' }) : null, info.expense ? h('i', { class: 'dot out' }) : null) : null);
     grid.append(cell);
   }
   paintSide();

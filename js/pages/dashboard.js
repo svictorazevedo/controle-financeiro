@@ -5,7 +5,7 @@ import { monthSummary, trend, accountBalances, budgetStatus, goalProgress, calen
 import { trendChart, donut, progress } from '../charts.js';
 import { h, brl, monthLabel, dateShort, dateLong, pctText } from '../ui.js';
 import { icon, ACCOUNT_ICONS } from '../icons.js';
-import { openTxDialog } from './tx.js';
+import { openTxDialog, canChangeTx } from './tx.js';
 
 function kpi(label, value, { iconName, tone = '', sub = null, delta = null, deltaGood = true } = {}) {
   let deltaEl = null;
@@ -44,13 +44,18 @@ export function miniCalendar(data, month, { onPick, selected = null } = {}) {
 
 function movementRow(mv) {
   const isIn = mv.type === 'income';
-  return h('li', { class: 'mv' },
+  const tx = mv.source === 'tx' ? state.d.transactions.find((t) => t.id === mv.id) : null;
+  const editable = tx && canChangeTx(tx);
+  const inner = [
     h('span', { class: `mv-ico ${isIn ? 'in' : 'out'}` }, icon(isIn ? 'arrow_in' : 'arrow_out', 16)),
-    h('div', { class: 'mv-main' },
-      h('span', { class: 'mv-desc' }, mv.description, mv.source === 'auto' ? h('span', { class: 'tag' }, 'automático') : null,
+    h('span', { class: 'mv-main' },
+      h('span', { class: 'mv-desc' }, h('span', { class: 'ell' }, mv.description), mv.source === 'auto' ? h('span', { class: 'tag' }, 'automático') : null,
         mv.attachment ? h('span', { class: 'clip', title: 'Tem comprovante' }, icon('clip', 14)) : null),
       h('span', { class: 'mv-meta' }, dateShort(mv.date), ' · ', categoryChip(mv.categoryId), ' · ', accountName(mv.accountId))),
-    h('span', { class: `mv-val num ${isIn ? 'pos' : 'neg'}` }, `${isIn ? '+' : '−'} ${brl(mv.amount)}`));
+    h('span', { class: `mv-val num ${isIn ? 'pos' : 'neg'}` }, `${isIn ? '+' : '−'} ${brl(mv.amount)}`)];
+  return editable
+    ? h('li', {}, h('button', { type: 'button', class: 'mv tap', title: 'Editar', onclick: () => openTxDialog(tx) }, ...inner))
+    : h('li', { class: 'mv' }, ...inner);
 }
 
 export async function renderDashboard() {
@@ -81,7 +86,7 @@ export async function renderDashboard() {
   const todayMv = movements(d, today, today);
   const ts = sumBy(todayMv);
   const next7 = movements(d, addDays(today, 1), addDays(today, 7)).filter((m) => m.type === 'expense');
-  const todayCard = card(`Hoje, ${dateLong(today)}`, { cls: 'today-card span-3' },
+  const todayCard = card(`Hoje, ${dateLong(today)}`, { cls: 'today-card span-3 o-today' },
     h('div', { class: 'today-grid' },
       h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, 'Entradas hoje'), h('strong', { class: 'num pos' }, brl(ts.income))),
       h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, 'Saídas hoje'), h('strong', { class: 'num neg' }, brl(ts.expense))),
@@ -90,15 +95,15 @@ export async function renderDashboard() {
         h('small', { class: 'muted' }, `${next7.length} conta(s)`))));
 
   // Tendência + mini calendário
-  const trendCard = card('Entradas x saídas', { sub: 'Últimos 6 meses', cls: 'span-2' }, trendChart(trend(d, month, 6), { current: month }));
+  const trendCard = card('Entradas x saídas', { sub: 'Últimos 6 meses', cls: 'span-2 o-trend' }, trendChart(trend(d, month, 6), { current: month }));
   const calCard = card(monthLabel(month), {
-    sub: 'Dias com movimentação',
+    sub: 'Dias com movimentação', cls: 'o-cal',
     actions: perm('calendario') ? h('a', { class: 'link', href: '#/calendario' }, 'Abrir calendário') : null,
   }, miniCalendar(d, month, { onPick: (date) => { location.hash = `#/calendario?d=${date}`; } }),
   h('div', { class: 'legend small' }, h('span', {}, h('i', { class: 'dot in' }), 'Entrada'), h('span', {}, h('i', { class: 'dot out' }), 'Saída')));
 
   // Contas
-  const accCard = card('Contas', { actions: perm('contas') ? h('a', { class: 'link', href: '#/contas' }, 'Ver todas') : null },
+  const accCard = card('Contas', { cls: 'o-acc', actions: perm('contas') ? h('a', { class: 'link', href: '#/contas' }, 'Ver todas') : null },
     balances.accounts.length ? h('ul', { class: 'acc-list' }, ...balances.accounts.filter((r) => !r.account?.archived).map((r) => h('li', {},
       h('span', { class: 'acc-ico', style: { '--c': r.account?.color || 'var(--muted-mark)' } }, icon(ACCOUNT_ICONS[r.account?.kind] ?? 'coins', 16)),
       h('span', { class: 'acc-name' }, r.account?.name ?? 'Sem conta'),
@@ -110,6 +115,7 @@ export async function renderDashboard() {
   const bs = budgetStatus(d, month);
   const brows = bs.rows.filter((r) => r.planned).sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0)).slice(0, 5);
   const budgetCard = perm('orcamento') || perm('painel') ? card('Orçamento do mês', {
+    cls: 'o-budget',
     sub: bs.planned ? `${brl(bs.spent)} de ${brl(bs.planned)} planejados` : null,
     actions: perm('orcamento') ? h('a', { class: 'link', href: '#/orcamento' }, 'Detalhar') : null,
   }, brows.length ? h('ul', { class: 'budget-list' }, ...brows.map((r) => h('li', {},
@@ -122,7 +128,7 @@ export async function renderDashboard() {
   // Metas
   const goals = (d.savingsGoals ?? []).filter((g) => !g.archived).map((g) => ({ g, p: goalProgress(g, d.deposits ?? [], today) }))
     .filter((x) => x.p.status !== 'done').slice(0, 4);
-  const goalsCard = card('Metas em andamento', { actions: perm('metas') ? h('a', { class: 'link', href: '#/metas' }, 'Ver metas') : null },
+  const goalsCard = card('Metas em andamento', { cls: 'o-goals', actions: perm('metas') ? h('a', { class: 'link', href: '#/metas' }, 'Ver metas') : null },
     goals.length ? h('ul', { class: 'goal-list' }, ...goals.map(({ g, p }) => h('li', {},
       h('div', { class: 'bl-top' }, h('strong', {}, g.name), h('span', { class: 'num' }, pctText(p.ratio))),
       progress(p.ratio, p.status === 'late' ? 'over' : 'ok', g.color),
@@ -131,13 +137,13 @@ export async function renderDashboard() {
       : emptyState('target', 'Nenhuma meta em andamento', 'Crie metas de economia com valor e data.'));
 
   // Categorias + últimos lançamentos
-  const catCard = card('Saídas por categoria', { sub: monthLabel(month) },
+  const catCard = card('Saídas por categoria', { sub: monthLabel(month), cls: 'o-cat' },
     sm.expensesByCategory.length ? donut(sm.expensesByCategory, { total: 'Saídas' }) : emptyState('pie', 'Nenhuma saída no mês', null));
   const launched = movements(d, `${month}-01`, dateFor(month, 31), { automatic: false }).reverse();
   const lastIn = launched.filter((m) => m.type === 'income').slice(0, 5);
   const lastOut = launched.filter((m) => m.type === 'expense').slice(0, 5);
   const lastCard = card('Últimos lançamentos', {
-    cls: 'span-2',
+    cls: 'span-2 o-last',
     actions: perm('lancamentos') ? h('a', { class: 'link', href: '#/lancamentos' }, 'Ver todos') : null,
   }, h('div', { class: 'two-cols' },
     h('div', {}, h('h3', { class: 'col-title' }, icon('arrow_in', 16), 'Entradas'),
