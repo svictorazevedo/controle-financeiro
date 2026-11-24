@@ -57,8 +57,28 @@ export function setCurrency(code) {
     setCurrency('BRL');
   }
 }
-export const brl = (cents) => FMT.format((cents || 0) / 100);
-export const brlCompact = (cents) => FMT_COMPACT.format((cents || 0) / 100);
+// ---------------------------------------------------------------- modo privacidade (olho na barra superior)
+// Com o olho fechado, todo valor formatado vira "R$ •••••" em todas as telas. A escolha fica guardada
+// neste navegador: se você fechou o olho, o sistema já abre com os valores escondidos.
+let PRIVATE = false;
+try {
+  PRIVATE = localStorage.getItem('hideValues') === '1';
+} catch { /* ignore */ }
+if (typeof document !== 'undefined') document.documentElement.classList.toggle('privacy', PRIVATE);
+export const isPrivate = () => PRIVATE;
+export function setPrivate(on) {
+  PRIVATE = !!on;
+  document.documentElement.classList.toggle('privacy', PRIVATE);
+  try {
+    localStorage.setItem('hideValues', PRIVATE ? '1' : '0');
+  } catch { /* ignore */ }
+}
+const mask = (fmt) => `${fmt.formatToParts(0).find((p) => p.type === 'currency')?.value ?? ''} •••••`.trim();
+
+/** Valor real, mesmo com o olho fechado (PDF que o usuário pediu para baixar). */
+export const brlReal = (cents) => FMT.format((cents || 0) / 100);
+export const brl = (cents) => (PRIVATE ? mask(FMT) : brlReal(cents));
+export const brlCompact = (cents) => (PRIVATE ? mask(FMT_COMPACT) : FMT_COMPACT.format((cents || 0) / 100));
 /** Valor com sinal explícito (+/−), para extratos. */
 export const money = (cents, signed = false) => (signed && cents > 0 ? `+${brl(cents)}` : brl(cents));
 

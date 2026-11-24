@@ -2,19 +2,22 @@
 import { state, page, card, field, input, select, routeParams } from '../ctx.js';
 import { REPORTS, buildReport } from '../reports.js';
 import { localToday, dateFor, addMonths } from '../finance.js';
-import { h, brl, dateBr, monthLabel, download, pctText, toast } from '../ui.js';
+import { h, brl, brlReal, dateBr, monthLabel, download, pctText, toast } from '../ui.js';
 import { icon } from '../icons.js';
 import { tablePdf } from '../pdf.js';
 import { trendChart } from '../charts.js';
 
 const params = { r: 'entradas', from: null, to: null, month: null, ahead: 30, accountId: null };
 
-function fmt(col, v, forCsv = false) {
+// real = true: PDF baixado mostra os valores mesmo com o olho fechado (a tela continua escondida).
+function fmt(col, v, forCsv = false, real = false) {
   if (v === null || v === undefined || v === '') return '';
   switch (col.type) {
-    case 'money':
+    case 'money': {
       if (forCsv) return (v / 100).toFixed(2).replace('.', ',');
-      return col.signed && v > 0 ? `+${brl(v)}` : brl(v);
+      const f = real ? brlReal : brl;
+      return col.signed && v > 0 ? `+${f(v)}` : f(v);
+    }
     case 'date': return dateBr(v);
     case 'month': return v === 'Total' ? v : forCsv ? v : `${monthLabel(v, true)}/${v.slice(0, 4)}`;
     case 'percent': return forCsv ? (v * 100).toFixed(1).replace('.', ',') : pctText(v);
@@ -120,8 +123,8 @@ export async function renderReports() {
     const bytes = tablePdf({
       title: rep.title, subtitle: rep.subtitle.replace(/(\d{4})-(\d{2})-(\d{2})/g, '$3/$2/$1'), org, generatedAt: generated,
       columns: rep.columns.map((c) => ({ label: c.label, align: c.align, weight: c.key === 'description' ? 3 : c.key === 'category' ? 2 : c.type === 'money' ? 1.4 : 1 })),
-      rows: rep.rows.map((r) => rep.columns.map((c) => fmt(c, r[c.key]))),
-      footer: rep.footer ? rep.columns.map((c) => fmt(c, rep.footer[c.key])) : null,
+      rows: rep.rows.map((r) => rep.columns.map((c) => fmt(c, r[c.key], false, true))),
+      footer: rep.footer ? rep.columns.map((c) => fmt(c, rep.footer[c.key], false, true)) : null,
     });
     download(filename(rep, 'pdf'), new Blob([bytes], { type: 'application/pdf' }));
     toast('PDF gerado.');

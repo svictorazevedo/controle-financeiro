@@ -4,11 +4,12 @@
 import { sb, q, configured, secretKeyError, friendly } from './api.js';
 import { state, loadMe, loadHouse, perm, isAdmin, canEdit, setRerender, field, input, run, applyBranding } from './ctx.js';
 import { addMonths, localToday } from './finance.js';
-import { h, $, clear, toast, monthLabel, initials, menuButton, openDialog, MOBILE_MQ } from './ui.js';
+import { h, $, clear, toast, monthLabel, initials, menuButton, openDialog, MOBILE_MQ, isPrivate, setPrivate } from './ui.js';
 import { icon } from './icons.js';
 import { renderDashboard } from './pages/dashboard.js';
 import { renderTransactions } from './pages/transactions.js';
 import { renderAccounts } from './pages/accounts.js';
+import { renderShopping } from './pages/shopping.js';
 import { renderRecurring } from './pages/recurring.js';
 import { renderBudget } from './pages/budget.js';
 import { renderGoals } from './pages/goals.js';
@@ -38,6 +39,7 @@ const ROUTES = [
   ['painel', 'Painel', 'dashboard', 'painel', 'Visão geral', renderDashboard],
   ['calendario', 'Calendário', 'calendar', 'calendario', 'Visão geral', renderCalendar],
   ['lancamentos', 'Lançamentos', 'receipt', 'lancamentos', 'Movimentação', renderTransactions],
+  ['compras', 'Compras', 'cart', 'compras', 'Movimentação', renderShopping],
   ['contas', 'Contas', 'bank', 'contas', 'Movimentação', renderAccounts],
   ['recorrentes', 'Fixos e recorrentes', 'repeat', 'recorrentes', 'Movimentação', renderRecurring],
   ['orcamento', 'Orçamento', 'pie', 'orcamento', 'Planejamento', renderBudget],
@@ -100,13 +102,15 @@ function buildShell() {
       paintTheme();
     },
   });
+  shell.eye = h('button', { type: 'button', class: 'icon-btn eye-btn', onclick: togglePrivacy });
+  paintEye();
   shell.user = h('div', { class: 'user-menu' });
   // Celular: microfone no topo e barra de navegação embaixo (o "+" central abre o lançamento).
   shell.mic = h('button', { type: 'button', class: 'icon-btn phone-only mic-top', 'aria-label': 'Lançar por voz com IA', onclick: () => openVoiceDialog() }, icon('mic', 20));
   shell.topbar = h('header', { class: 'topbar' },
     h('button', { type: 'button', class: 'icon-btn mobile-only tablet-only', 'aria-label': 'Abrir menu', onclick: () => document.body.classList.toggle('nav-open') }, icon('menu', 20)),
     shell.monthBox, shell.today,
-    h('div', { class: 'top-right' }, shell.house, shell.add, shell.mic, shell.theme, shell.user));
+    h('div', { class: 'top-right' }, shell.house, shell.add, shell.mic, shell.eye, shell.theme, shell.user));
   shell.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Navegação principal' });
   layout.append(shell.sidebar, shell.scrim, h('div', { class: 'main-col' }, shell.topbar, $('#app')), shell.tabbar);
 }
@@ -195,6 +199,20 @@ function openMoreSheet(route) {
         h('button', { type: 'button', class: 'btn ghost danger-text', onclick: () => sb.auth.signOut() }, icon('logout', 18), h('span', {}, 'Sair')))),
     onClose: () => go?.(),
   });
+}
+// Olho: mostra/esconde os valores em todo o sistema (atalho: tecla O).
+function paintEye() {
+  const hidden = isPrivate();
+  shell.eye.replaceChildren(icon(hidden ? 'eye_off' : 'eye', 18));
+  shell.eye.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+  shell.eye.setAttribute('aria-label', hidden ? 'Mostrar valores' : 'Esconder valores');
+  shell.eye.title = `${hidden ? 'Mostrar' : 'Esconder'} valores (O)`;
+}
+function togglePrivacy() {
+  setPrivate(!isPrivate());
+  paintEye();
+  toast(isPrivate() ? 'Valores escondidos em todas as telas.' : 'Valores visíveis.');
+  if (state.user && state.d && !document.querySelector('dialog[open]')) render();
 }
 function paintTheme() {
   shell.theme.replaceChildren(icon(isDark() ? 'sun' : 'moon', 18));
@@ -447,6 +465,12 @@ function labelTables(root) {
 }
 new MutationObserver(() => labelTables($('#app'))).observe($('#app'), { childList: true, subtree: true });
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'o' && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea|select/i.test(document.activeElement?.tagName ?? '')
+    && !document.querySelector('dialog[open]') && state.user) {
+    e.preventDefault();
+    togglePrivacy();
+    return;
+  }
   // Atalhos: "n" novo lançamento, "v" lançamento por voz (fora de campos de texto)
   if ((e.key === 'n' || e.key === 'v') && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea|select/i.test(document.activeElement?.tagName ?? '')
     && !document.querySelector('dialog[open]') && state.d && canEdit('lancamentos')) {

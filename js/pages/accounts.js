@@ -4,6 +4,7 @@ import { state, page, card, canEdit, field, input, select, moneyInput, colorPick
 import { accountBalances, localToday, dateFor, movements, sumBy } from '../finance.js';
 import { h, toast, brl, openDialog, confirmDialog, parseMoney, centsToInput, menuButton, monthLabel } from '../ui.js';
 import { icon, ACCOUNT_ICONS } from '../icons.js';
+import { openImportDialog } from './import.js';
 
 export const ACCOUNT_KINDS = [
   { value: 'checking', label: 'Conta corrente' }, { value: 'savings', label: 'Poupança' }, { value: 'wallet', label: 'Carteira (dinheiro)' },
@@ -59,6 +60,7 @@ export async function renderAccounts() {
           a?.archived ? h('span', { class: 'tag' }, 'arquivada') : null),
         a && edit ? menuButton([
           { label: 'Editar', icon: 'pencil', onclick: () => accountDialog(a) },
+          !a.archived && canEdit('lancamentos') ? { label: a.kind === 'credit' ? 'Importar fatura' : 'Importar extrato', icon: 'upload', onclick: () => openImportDialog({ accountId: a.id }) } : null,
           {
             label: 'Excluir', icon: 'trash', danger: true,
             onclick: async () => {

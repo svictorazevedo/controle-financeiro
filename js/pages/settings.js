@@ -8,7 +8,7 @@ import { icon } from '../icons.js';
 export const MODULES = [
   ['painel', 'Painel', 'dashboard'], ['lancamentos', 'Lançamentos', 'receipt'], ['contas', 'Contas', 'bank'],
   ['recorrentes', 'Fixos e recorrentes', 'repeat'], ['categorias', 'Categorias', 'tag'], ['orcamento', 'Orçamento', 'pie'],
-  ['metas', 'Metas', 'target'], ['relatorios', 'Relatórios', 'report'], ['calendario', 'Calendário', 'calendar'], ['ia', 'Assistente IA', 'sparkles'],
+  ['metas', 'Metas', 'target'], ['relatorios', 'Relatórios', 'report'], ['calendario', 'Calendário', 'calendar'], ['ia', 'Assistente IA', 'sparkles'], ['compras', 'Compras', 'cart'],
 ];
 const LEVELS = [{ value: '0', label: 'Sem acesso' }, { value: '1', label: 'Ver' }, { value: '2', label: 'Editar' }];
 
@@ -22,7 +22,7 @@ function permissionsDialog(r) {
   });
   const presets = h('div', { class: 'chips' }, h('span', { class: 'hint' }, 'Modelos:'),
     ...[['Padrão', PERM_DEFAULTS], ['Só consulta', Object.fromEntries(MODULES.map(([k]) => [k, 1]))],
-      ['Só lança gastos', { painel: 1, lancamentos: 2, contas: 0, recorrentes: 0, categorias: 1, orcamento: 0, metas: 0, relatorios: 0, calendario: 1, ia: 0 }]]
+      ['Só lança gastos', { painel: 1, lancamentos: 2, contas: 0, recorrentes: 0, categorias: 1, orcamento: 0, metas: 0, relatorios: 0, calendario: 1, ia: 0, compras: 2 }]]
       .map(([label, p]) => h('button', {
         type: 'button', class: 'chip',
         onclick: () => {

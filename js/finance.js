@@ -335,7 +335,7 @@ export function categoryTree(categories, type) {
 
 /** Nível de permissão (0, 1, 2) de um morador num módulo — espelha public.perm() do banco. */
 export const PERM_DEFAULTS = {
-  painel: 1, lancamentos: 2, contas: 1, recorrentes: 2, categorias: 2, orcamento: 1, metas: 2, relatorios: 1, calendario: 1, ia: 1,
+  painel: 1, lancamentos: 2, contas: 1, recorrentes: 2, categorias: 2, orcamento: 1, metas: 2, relatorios: 1, calendario: 1, ia: 1, compras: 2,
 };
 export function permOf(resident, module) {
   if (!resident) return 0;

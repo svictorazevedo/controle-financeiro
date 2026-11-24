@@ -5,6 +5,7 @@ import { h, brl, dateBr, menuButton, segmented, monthLabel, download, isMobile, 
 import { icon } from '../icons.js';
 import { openTxDialog, deleteTx, viewAttachment, canChangeTx } from './tx.js';
 import { openVoiceDialog } from './voice.js';
+import { openImportDialog } from './import.js';
 
 // Filtros ficam guardados enquanto o app está aberto.
 const filters = { type: 'all', preset: 'month', from: null, to: null, account: '', category: '', q: '', auto: true, open: false };
@@ -214,6 +215,10 @@ export async function renderTransactions() {
     subtitle: `${dateBr(from)} a ${dateBr(to)}`,
     actions: [
       h('button', { type: 'button', class: 'btn ghost compact', onclick: exportCsv, title: 'Exportar CSV' }, icon('download', 18), h('span', {}, 'CSV')),
+      canEdit('lancamentos') ? h('button', {
+        type: 'button', class: 'btn ghost compact', title: 'Importar extrato do banco ou fatura do cartão (OFX/CSV)',
+        onclick: () => openImportDialog({ accountId: filters.account && filters.account !== 'none' ? filters.account : null }),
+      }, icon('upload', 18), h('span', {}, 'Importar extrato')) : null,
       canEdit('lancamentos') && !mobile ? h('button', { type: 'button', class: 'btn ghost', onclick: () => openVoiceDialog() }, icon('mic', 18), h('span', {}, 'Por voz')) : null,
       canEdit('lancamentos') && !mobile ? h('button', { type: 'button', class: 'btn income', onclick: () => openTxDialog(null, { type: 'income' }) }, icon('arrow_in', 18), h('span', {}, 'Entrada')) : null,
       canEdit('lancamentos') && !mobile ? h('button', { type: 'button', class: 'btn expense', onclick: () => openTxDialog(null, { type: 'expense' }) }, icon('arrow_out', 18), h('span', {}, 'Saída')) : null,

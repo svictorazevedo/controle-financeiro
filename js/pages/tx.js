@@ -176,8 +176,14 @@ export async function deleteTx(tx) {
   });
   if (!ok) return;
   const done = await run(null, async () => {
+    // A foto de um cupom fiscal (tela Compras) é compartilhada com o lançamento: nesse caso ela fica.
+    let shared = false;
+    if (tx.attachment_path) {
+      const { data } = await sb.from('shop_receipts').select('id').eq('transaction_id', tx.id).limit(1);
+      shared = !!data?.length;
+    }
     await q(sb.from('transactions').delete().eq('id', tx.id));
-    if (tx.attachment_path) await sb.storage.from('receipts').remove([tx.attachment_path]);
+    if (tx.attachment_path && !shared) await sb.storage.from('receipts').remove([tx.attachment_path]);
   }, 'Lançamento excluído.');
   if (done) await reload();
 }

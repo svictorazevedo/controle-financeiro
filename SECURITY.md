@@ -9,7 +9,7 @@ Não existe servidor próprio, e o código do site é público. Isso exige três
 - **Supor que o atacante chama a API diretamente**, sem passar pelas telas.
 
 Os itens com 🧪 são verificados pelos testes:
-- `npm run test:db`: 70 verificações das regras do banco (77 em `npm run test:migration`, que parte da v1);
+- `npm run test:db`: 105 verificações das regras do banco, incluindo Compras (112 em `npm run test:migration`, que parte da v1);
 - `npm test`: cálculos, relatórios e PDF.
 
 ## 1. Ameaças e defesas
@@ -40,6 +40,8 @@ Os itens com 🧪 são verificados pelos testes:
 | 22 | **Logo/ícone com script** 🧪 | Só `data:image/png|jpeg|webp;base64` (SVG recusado por `CHECK`), com tamanho máximo. | `schema.sql` |
 | 23 | **CSV com fórmula** (planilha executando `=HYPERLINK(...)`) | Células de texto que começam com `= + @` ganham um apóstrofo antes. | `js/pages/reports.js`, `transactions.js` |
 | 24 | **Áudio do lançamento por voz** | Não é gravado nem enviado ao Supabase: o reconhecimento é do navegador (Web Speech API; no Chrome, processado pelo serviço de voz do Google) e o app só recebe o texto. O texto (até 1.000 caracteres) vai para a IA dentro de `<fala>`, tratado como dado. A IA só escolhe categorias/contas/pessoas da própria casa por códigos curtos e nada é gravado sem o usuário confirmar; a gravação passa pelo RLS normal. Exige "Lançamentos: editar" e conta no limite de pedidos por hora. | `js/pages/voice.js`, `functions/ai` |
+| 25 | **Foto do cupom / dados de compras** 🧪 | Tabelas de Compras com RLS e 2FA como as demais; permissão própria "Compras" (0/1/2). Cupom só altera/exclui quem lançou ou o admin. A foto fica no bucket privado `receipts` (caminho começa pelo id da casa, conferido por `CHECK` e pela Edge Function, que só baixa arquivos da própria casa). O cupom inteiro é salvo por `save_shop_receipt` (`SECURITY INVOKER`: vale o RLS de quem chama) numa transação só. Chave de acesso única por casa (não lança o mesmo cupom duas vezes). | `003_compras.sql`, `functions/ai` |
+| 26 | **Pesquisa de preços / prompt injection pela web** | Vão para a IA só nomes de produtos, a região e os nomes dos mercados. Resultados da web são tratados como dados; a resposta é validada (preço > 0, URL só `https://`, produto só dos códigos enviados). Endereços citados que não vieram da busca ficam marcados como "fonte não conferida". Links abrem com `noopener noreferrer nofollow`. Conta no limite de pedidos por hora. | `functions/ai`, `js/pages/shopping.js` |
 
 ## 2. Recomendações (dependem de você, no painel)
 

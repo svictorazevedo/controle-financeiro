@@ -44,6 +44,13 @@ const DB_MSG = {
   resident_has_login: 'Esse morador já tem login.',
   categories_house_name_key: 'Já existe uma categoria com esse nome.',
   forbidden: 'Você não tem permissão para esta ação.',
+  shop_receipts_access_key: 'Esse cupom já foi lançado (mesma chave de acesso).',
+  receipt_items_invalid: 'O cupom precisa ter de 1 a 300 itens.',
+  products_house_name_key: 'Já existe um produto com esse nome.',
+  products_house_ean_key: 'Já existe um produto com esse código de barras.',
+  stores_house_name_key: 'Já existe um mercado com esse nome.',
+  stores_house_cnpj_key: 'Já existe um mercado com esse CNPJ.',
+  product_not_found: 'Produto não encontrado (talvez tenha sido mesclado ou excluído). Recarregue a página.',
 };
 
 export function friendly(err) {
