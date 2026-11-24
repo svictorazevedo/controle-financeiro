@@ -1,13 +1,20 @@
 {
+  "id": "./",
   "name": "Controle Financeiro",
   "short_name": "Finanças",
+  "description": "Contas, lançamentos, orçamento, metas e compras da casa.",
   "lang": "pt-BR",
   "start_url": "./#/painel",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f5f9",
+  "orientation": "portrait",
+  "background_color": "#1747a6",
   "theme_color": "#2a78d6",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "icons/icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg?v=2", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

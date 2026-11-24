@@ -78,7 +78,7 @@ export async function loadHouse() {
 /** Ícone próprio da casa/empresa na aba do navegador. */
 export function applyBranding() {
   const link = document.querySelector('link[rel="icon"]');
-  if (link) link.href = state.d?.house?.icon || 'icon.svg';
+  if (link) link.href = state.d?.house?.icon || 'icon.svg?v=2';
   document.title = state.d?.house?.name ? `${state.d.house.name} · Controle Financeiro` : 'Controle Financeiro';
 }
 
